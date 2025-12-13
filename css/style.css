@@ -924,6 +924,32 @@ textarea:focus {
     min-height: auto !important;
 }
 
+.btn-outline {
+    background: transparent !important;
+    border: 1px solid var(--primary-color) !important;
+    color: var(--primary-color) !important;
+}
+
+.btn-outline:hover {
+    background: var(--primary-color) !important;
+    color: white !important;
+}
+
+.btn-link {
+    background: none !important;
+    border: none !important;
+    color: var(--primary-color) !important;
+    padding: 0 !important;
+    font-size: inherit !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+}
+
+.btn-link:hover {
+    color: var(--primary-hover) !important;
+    text-decoration: none !important;
+}
+
 .delete-history {
     background: var(--error-color) !important;
 }
@@ -934,10 +960,35 @@ textarea:focus {
 
 .config-status i {
     font-size: 1rem;
+    margin-right: 6px;
 }
 
 .config-status span {
     font-weight: 500;
+}
+
+.config-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.config-actions .btn {
+    font-size: 0.8rem !important;
+}
+
+.form-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-text .btn-link {
+    font-size: 0.8rem !important;
 }
 
 /* 打印样式 */

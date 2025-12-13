@@ -3,6 +3,13 @@
  * 负责与Nano Banana Pro API的交互
  */
 
+// API密钥来源枚举
+const API_KEY_SOURCE = {
+    DEFAULT: 'default',     // 开发者密钥（配置文件中）
+    USER: 'user',          // 用户自己的密钥
+    NONE: 'none'           // 未设置
+};
+
 class NanoBananaClient {
     constructor() {
         // 从全局配置加载API配置
@@ -13,6 +20,9 @@ class NanoBananaClient {
         this.pollingIntervals = new Map(); // 存储轮询定时器
         this.currentPollingTimer = null; // 当前轮询定时器
         this.initialized = false;
+
+        // 添加密钥来源追踪
+        this.apiKeySource = API_KEY_SOURCE.NONE;
     }
 
     /**
@@ -67,8 +77,21 @@ class NanoBananaClient {
         this.config = this.loadConfig();
         this.apiEndpoint = this.config.apiEndpoint;
 
-        // 尝试从配置或本地存储加载API密钥
-        this.apiKey = this.config.apiKey || await this.loadApiKey();
+        // 智能密钥管理：优先使用用户密钥，其次使用默认密钥
+        const userKey = await this.loadUserApiKey();
+        if (userKey) {
+            this.apiKey = userKey;
+            this.apiKeySource = API_KEY_SOURCE.USER;
+            console.log('使用用户API密钥');
+        } else if (this.config.apiKey) {
+            this.apiKey = this.config.apiKey;
+            this.apiKeySource = API_KEY_SOURCE.DEFAULT;
+            console.log('使用默认API密钥');
+        } else {
+            this.apiKey = null;
+            this.apiKeySource = API_KEY_SOURCE.NONE;
+            console.log('未设置API密钥');
+        }
 
         this.initialized = true;
         console.log('Nano Banana API客户端初始化完成');
@@ -84,6 +107,65 @@ class NanoBananaClient {
         if (config.apiKey) {
             this.apiKey = config.apiKey;
             this.saveApiKey(config.apiKey);
+        }
+    }
+
+    /**
+     * 设置用户API密钥
+     * @param {string} apiKey - 用户的API密钥
+     * @param {boolean} saveToLocal - 是否保存到本地存储，默认true
+     * @returns {Promise<boolean>} 设置是否成功
+     */
+    async setUserApiKey(apiKey, saveToLocal = true) {
+        // 验证API密钥格式
+        if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+            throw new Error('API密钥不能为空');
+        }
+
+        // 设置到内存
+        this.apiKey = apiKey.trim();
+        this.apiKeySource = API_KEY_SOURCE.USER;
+
+        // 保存到本地存储（如果需要）
+        if (saveToLocal) {
+            try {
+                // 使用不同的存储键，区分用户密钥和默认密钥
+                if (window.securityUtils) {
+                    await window.securityUtils.saveSecureData('user_nano_banana_api_key', apiKey);
+                } else {
+                    localStorage.setItem('user_nano_banana_api_key', apiKey);
+                }
+                console.log('用户API密钥已保存到本地存储');
+            } catch (error) {
+                console.error('保存用户API密钥失败:', error);
+                // 即使保存失败，内存中的设置仍然有效
+            }
+        }
+
+        console.log('用户API密钥已设置，将优先使用');
+        return true;
+    }
+
+    /**
+     * 清除用户API密钥，恢复使用默认密钥
+     * @returns {Promise<boolean>} 是否清除成功
+     */
+    async clearUserApiKey() {
+        this.apiKey = this.config.apiKey || null;
+        this.apiKeySource = this.apiKey ? API_KEY_SOURCE.DEFAULT : API_KEY_SOURCE.NONE;
+
+        try {
+            // 清除本地存储
+            if (window.securityUtils) {
+                await window.securityUtils.removeSecureData('user_nano_banana_api_key');
+            } else {
+                localStorage.removeItem('user_nano_banana_api_key');
+            }
+            console.log('已清除用户API密钥，恢复使用默认密钥');
+            return true;
+        } catch (error) {
+            console.error('清除用户API密钥失败:', error);
+            return false;
         }
     }
 
@@ -109,6 +191,10 @@ class NanoBananaClient {
             if (!this.apiKey) {
                 throw new Error('未设置API密钥，请先配置');
             }
+
+            // 记录API调用来源（用于用量追踪）
+            const apiSource = this.apiKeySource === API_KEY_SOURCE.USER ? 'user' : 'default';
+            console.log(`创建任务 - API密钥来源: ${apiSource}`);
 
             // 构造API请求参数
             const apiParams = this.buildAPIParams(promptData, options);
@@ -161,6 +247,10 @@ class NanoBananaClient {
             }
 
             const url = `${this.apiEndpoint}recordInfo?taskId=${encodeURIComponent(taskId)}`;
+
+            // 记录API调用来源（用于用量追踪）
+            const apiSource = this.apiKeySource === API_KEY_SOURCE.USER ? 'user' : 'default';
+            console.log(`查询任务状态 - API密钥来源: ${apiSource}`);
 
             const response = await fetch(url, {
                 method: 'GET',
@@ -468,6 +558,25 @@ class NanoBananaClient {
         } catch (error) {
             console.error('保存API密钥失败:', error);
             throw error;
+        }
+    }
+
+    /**
+     * 加载用户设置的API密钥
+     * @returns {Promise<string|null>} 用户API密钥或null
+     */
+    async loadUserApiKey() {
+        try {
+            if (window.securityUtils) {
+                // 使用安全工具解密加载
+                return await window.securityUtils.loadSecureData('user_nano_banana_api_key');
+            } else {
+                // 直接加载（不安全，仅用于开发）
+                return localStorage.getItem('user_nano_banana_api_key');
+            }
+        } catch (error) {
+            console.error('加载用户API密钥失败:', error);
+            return null;
         }
     }
 

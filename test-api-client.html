@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API客户端测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>Nano Banana API 客户端测试</h1>
+
+    <div class="test-section">
+        <h2>1. 初始化测试</h2>
+        <button onclick="testInitialization()">测试初始化</button>
+        <div id="initResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. API密钥管理测试</h2>
+        <button onclick="testDefaultKey()">测试默认密钥</button>
+        <button onclick="testUserKey()">测试用户密钥</button>
+        <button onclick="testClearUserKey()">清除用户密钥</button>
+        <button onclick="testKeyPriority()">测试密钥优先级</button>
+        <div id="keyResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. API调用测试</h2>
+        <button onclick="testAPICall()">测试API调用</button>
+        <div id="apiResult" class="result"></div>
+    </div>
+
+    <!-- 加载必要的脚本 -->
+    <script src="config.js"></script>
+    <script src="js/security-utils.js"></script>
+    <script src="js/api-client.js"></script>
+
+    <script>
+        // 全局变量
+        let client;
+        const resultDivs = {
+            init: document.getElementById('initResult'),
+            key: document.getElementById('keyResult'),
+            api: document.getElementById('apiResult')
+        };
+
+        // 初始化
+        async function init() {
+            try {
+                // 模拟全局配置
+                window.config = {
+                    apiEndpoint: 'https://api.kie.ai/api/v1/jobs/',
+                    apiKey: 'sk-test-default-key-123456789'
+                };
+
+                // 初始化安全工具
+                if (typeof SecurityUtils !== 'undefined') {
+                    window.securityUtils = new SecurityUtils();
+                }
+
+                // 创建API客户端
+                client = new NanoBananaClient();
+                await client.initialize();
+
+                appendResult('init', '✅ 客户端初始化成功', 'success');
+                appendResult('init', `API端点: ${client.apiEndpoint}`, 'info');
+                appendResult('init', `当前密钥来源: ${client.apiKeySource}`, 'info');
+                appendResult('init', `是否有密钥: ${!!client.apiKey}`, 'info');
+            } catch (error) {
+                appendResult('init', `❌ 初始化失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试初始化
+        async function testInitialization() {
+            await init();
+        }
+
+        // 测试默认密钥
+        async function testDefaultKey() {
+            try {
+                if (!client) {
+                    await init();
+                }
+
+                // 清除用户密钥，只保留默认密钥
+                await client.clearUserApiKey();
+                await client.initialize();
+
+                appendResult('key', '✅ 默认密钥测试:', 'success');
+                appendResult('key', `密钥来源: ${client.apiKeySource}`, 'info');
+                appendResult('key', `密钥存在: ${!!client.apiKey}`, 'info');
+                appendResult('key', `密钥值: ${client.apiKey ? client.apiKey.substring(0, 20) + '...' : 'null'}`, 'info');
+            } catch (error) {
+                appendResult('key', `❌ 默认密钥测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试用户密钥
+        async function testUserKey() {
+            try {
+                if (!client) {
+                    await init();
+                }
+
+                const testUserKey = 'sk-test-user-key-987654321';
+
+                // 设置用户密钥
+                await client.setUserApiKey(testUserKey);
+
+                appendResult('key', '✅ 用户密钥测试:', 'success');
+                appendResult('key', `密钥来源: ${client.apiKeySource}`, 'info');
+                appendResult('key', `密钥存在: ${!!client.apiKey}`, 'info');
+                appendResult('key', `密钥值: ${client.apiKey ? client.apiKey.substring(0, 20) + '...' : 'null'}`, 'info');
+            } catch (error) {
+                appendResult('key', `❌ 用户密钥测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 清除用户密钥
+        async function testClearUserKey() {
+            try {
+                if (!client) {
+                    await init();
+                }
+
+                await client.clearUserApiKey();
+
+                appendResult('key', '✅ 清除用户密钥成功', 'success');
+                appendResult('key', `密钥来源: ${client.apiKeySource}`, 'info');
+                appendResult('key', `密钥存在: ${!!client.apiKey}`, 'info');
+            } catch (error) {
+                appendResult('key', `❌ 清除用户密钥失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试密钥优先级
+        async function testKeyPriority() {
+            try {
+                if (!client) {
+                    await init();
+                }
+
+                appendResult('key', '🔄 测试密钥优先级...', 'info');
+
+                // 1. 先设置用户密钥
+                await client.setUserApiKey('sk-user-priority-test');
+                appendResult('key', `1. 设置用户密钥后: ${client.apiKeySource}`, 'info');
+
+                // 2. 重新初始化，应该优先使用用户密钥
+                await client.initialize();
+                appendResult('key', `2. 重新初始化后: ${client.apiKeySource}`, 'info');
+
+                // 3. 清除用户密钥，应该恢复默认密钥
+                await client.clearUserApiKey();
+                appendResult('key', `3. 清除用户密钥后: ${client.apiKeySource}`, 'info');
+
+                appendResult('key', '✅ 密钥优先级测试完成', 'success');
+            } catch (error) {
+                appendResult('key', `❌ 密钥优先级测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试API调用
+        async function testAPICall() {
+            try {
+                if (!client) {
+                    await init();
+                }
+
+                appendResult('api', '🔄 测试API调用（检查控制台日志）...', 'info');
+
+                // 这里只是测试方法调用，不实际发送请求
+                // 实际调用需要真实的API密钥和有效的提示词
+                appendResult('api', '✅ API客户端方法可用', 'success');
+                appendResult('api', 'ℹ️ 注意：实际API调用需要有效的API密钥', 'info');
+                appendResult('api', `ℹ️ 当前密钥来源: ${client.apiKeySource}`, 'info');
+                appendResult('api', `ℹ️ createTask方法存在: ${typeof client.createTask === 'function'}`, 'info');
+                appendResult('api', `ℹ️ queryTaskStatus方法存在: ${typeof client.queryTaskStatus === 'function'}`, 'info');
+            } catch (error) {
+                appendResult('api', `❌ API调用测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 辅助函数：添加结果
+        function appendResult(type, message, status = 'info') {
+            const div = resultDivs[type];
+            if (div) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = `status ${status}`;
+                statusDiv.textContent = message;
+                div.appendChild(statusDiv);
+                div.scrollTop = div.scrollHeight;
+            }
+        }
+
+        // 页面加载完成后自动初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            appendResult('init', '🚀 页面加载完成，准备测试...', 'info');
+        });
+    </script>
+</body>
+</html>

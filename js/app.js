@@ -45,18 +45,10 @@ class ChildrenLiteracyApp {
             // 恢复上次状态
             await this.restoreLastState();
 
-            // 检查用户API密钥
-            const hasApiKey = await this.checkUserApiKey();
+            // 检查API密钥状态（包括用户密钥和默认密钥）
+            const apiKeyStatus = await this.checkApiKeyStatus();
 
-            if (!hasApiKey) {
-                // 显示API密钥设置界面
-                this.showApiKeySetupModal();
-                this.hideLoading();
-                this.initialized = true;
-                return;
-            }
-
-            // 检查API配置（仅在用户有密钥时执行）
+            // 检查API配置
             await this.checkAPIConfiguration();
 
             this.initialized = true;
@@ -72,6 +64,88 @@ class ChildrenLiteracyApp {
             console.error('应用初始化失败:', error);
             this.hideLoading();
             this.showInitializationError(error);
+        }
+    }
+
+    /**
+     * 检查API密钥状态（包括用户密钥和默认密钥）
+     * @returns {Object} 返回密钥状态信息
+     */
+    async checkApiKeyStatus() {
+        try {
+            console.log('检查API密钥状态...');
+
+            // 检查API客户端初始化状态
+            if (!window.nanoBananaClient) {
+                console.error('API客户端未初始化');
+                return { hasApiKey: false, source: 'none' };
+            }
+
+            // 获取API客户端的密钥状态
+            const hasApiKey = !!window.nanoBananaClient.apiKey;
+            const source = window.nanoBananaClient.apiKeySource;
+
+            console.log(`API密钥状态: ${hasApiKey ? '已设置' : '未设置'}, 来源: ${source}`);
+
+            // 更新界面状态显示
+            this.updateApiKeyDisplay(hasApiKey, source);
+
+            return { hasApiKey, source };
+
+        } catch (error) {
+            console.error('检查API密钥状态失败:', error);
+            return { hasApiKey: false, source: 'none' };
+        }
+    }
+
+    /**
+     * 更新API密钥显示状态
+     */
+    updateApiKeyDisplay(hasApiKey, source) {
+        const statusElement = document.getElementById('apiKeyStatus');
+        const apiKeyInput = this.elements.apiKey;
+        const setUserBtn = document.getElementById('setUserApiKey');
+        const clearUserBtn = document.getElementById('clearUserApiKey');
+
+        if (!statusElement || !apiKeyInput) return;
+
+        if (hasApiKey) {
+            if (source === 'user') {
+                statusElement.innerHTML = `
+                    <i class="fas fa-user-check" style="color: #4CAF50;"></i>
+                    <span>使用用户API密钥</span>
+                `;
+                apiKeyInput.value = '•••••••••••••••••••••••';
+                apiKeyInput.placeholder = '用户密钥已配置';
+
+                // 显示"恢复默认密钥"按钮，隐藏"使用自己的密钥"按钮
+                if (setUserBtn) setUserBtn.style.display = 'none';
+                if (clearUserBtn) clearUserBtn.style.display = 'inline-block';
+            } else {
+                statusElement.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #96CEB4;"></i>
+                    <span>使用默认API密钥</span>
+                `;
+                apiKeyInput.value = '•••••••••••••••••••••••';
+                apiKeyInput.placeholder = '默认密钥已配置';
+
+                // 显示"使用自己的密钥"按钮，隐藏"恢复默认密钥"按钮
+                if (setUserBtn) setUserBtn.style.display = 'inline-block';
+                if (clearUserBtn) clearUserBtn.style.display = 'none';
+            }
+            apiKeyInput.readOnly = true;
+        } else {
+            statusElement.innerHTML = `
+                <i class="fas fa-exclamation-circle" style="color: #FFB648;"></i>
+                <span>API密钥未配置</span>
+            `;
+            apiKeyInput.readOnly = false;
+            apiKeyInput.value = '';
+            apiKeyInput.placeholder = '请输入API密钥';
+
+            // 显示"使用自己的密钥"按钮，隐藏"恢复默认密钥"按钮
+            if (setUserBtn) setUserBtn.style.display = 'inline-block';
+            if (clearUserBtn) clearUserBtn.style.display = 'none';
         }
     }
 
@@ -392,15 +466,221 @@ class ChildrenLiteracyApp {
     }
 
     /**
-     * 清除用户API密钥
+     * 清除用户API密钥并恢复默认密钥
      */
-    clearUserApiKey() {
+    async clearUserApiKey() {
         try {
+            // 清除本地存储
             localStorage.removeItem('user_api_key');
-            console.log('API密钥已清除');
+
+            // 调用API客户端的清除方法
+            if (window.nanoBananaClient && typeof window.nanoBananaClient.clearUserApiKey === 'function') {
+                await window.nanoBananaClient.clearUserApiKey();
+            }
+
+            // 更新界面显示
+            await this.checkApiKeyStatus();
+
+            this.showMessage('已恢复使用默认API密钥', 'success');
+            console.log('用户API密钥已清除，恢复使用默认密钥');
         } catch (error) {
-            console.error('清除API密钥失败:', error);
+            console.error('清除用户API密钥失败:', error);
+            this.showMessage('清除用户API密钥失败', 'error');
         }
+    }
+
+    /**
+     * 显示用户API密钥设置界面
+     */
+    showUserApiKeySetup() {
+        try {
+            console.log('显示用户API密钥设置界面...');
+
+            // 创建模态框
+            const modal = this.createUserApiKeyModal();
+
+            // 显示模态框
+            document.body.appendChild(modal);
+
+            // 显示模态框
+            setTimeout(() => {
+                modal.classList.add('show');
+            }, 50);
+
+            // 绑定关闭事件
+            this.bindModalEvents(modal);
+
+        } catch (error) {
+            console.error('显示用户API密钥设置界面失败:', error);
+            this.showMessage('显示设置界面失败', 'error');
+        }
+    }
+
+    /**
+     * 创建用户API密钥设置模态框
+     */
+    createUserApiKeyModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-user-plus"></i>
+                        设置您的API密钥
+                    </h3>
+                    <button class="modal-close" aria-label="关闭">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="userApiKeyInput">
+                            <i class="fas fa-key"></i>
+                            您的Nano Banana Pro API密钥
+                        </label>
+                        <div class="input-group">
+                            <input
+                                type="password"
+                                id="userApiKeyInput"
+                                class="form-control"
+                                placeholder="请输入您的API密钥"
+                                autocomplete="off"
+                            >
+                            <button type="button" id="toggleUserApiKeyVisibility" class="btn btn-icon">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i>
+                            设置后，您的密钥将优先于默认密钥使用
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-lightbulb"></i>
+                            想知道如何获取API密钥？<button type="button" id="showApiKeyGuide" class="btn-link">查看指南</button>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-shield-alt"></i>
+                        <div>
+                            <strong>隐私保护承诺：</strong>
+                            <ul>
+                                <li>您的API密钥将安全保存在浏览器本地</li>
+                                <li>我们不会上传或共享您的API密钥</li>
+                                <li>您可以随时切换回使用默认密钥</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancelUserApiKey" class="btn btn-outline">
+                        <i class="fas fa-times"></i> 取消
+                    </button>
+                    <button type="button" id="confirmUserApiKey" class="btn btn-primary">
+                        <i class="fas fa-check"></i> 确认设置
+                    </button>
+                </div>
+            </div>
+            <div class="modal-backdrop"></div>
+        `;
+
+        // 绑定事件
+        this.bindUserApiKeyModalEvents(modal);
+
+        return modal;
+    }
+
+    /**
+     * 绑定用户API密钥模态框事件
+     */
+    bindUserApiKeyModalEvents(modal) {
+        const input = modal.querySelector('#userApiKeyInput');
+        const toggleBtn = modal.querySelector('#toggleUserApiKeyVisibility');
+        const confirmBtn = modal.querySelector('#confirmUserApiKey');
+        const cancelBtn = modal.querySelector('#cancelUserApiKey');
+        const guideBtn = modal.querySelector('#showApiKeyGuide');
+        const closeBtn = modal.querySelector('.modal-close');
+
+        // 切换密钥可见性
+        toggleBtn.addEventListener('click', () => {
+            const type = input.type === 'password' ? 'text' : 'password';
+            input.type = type;
+            toggleBtn.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+
+        // 确认设置
+        confirmBtn.addEventListener('click', async () => {
+            await this.handleUserApiKeySetup(input.value.trim(), modal);
+        });
+
+        // 取消
+        cancelBtn.addEventListener('click', () => {
+            this.closeModal(modal);
+        });
+
+        // 显示指南
+        guideBtn.addEventListener('click', () => {
+            this.showApiKeyGetGuide();
+        });
+
+        // 关闭按钮
+        closeBtn.addEventListener('click', () => {
+            this.closeModal(modal);
+        });
+
+        // 回车确认
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmBtn.click();
+            }
+        });
+    }
+
+    /**
+     * 处理用户API密钥设置
+     */
+    async handleUserApiKeySetup(apiKey, modal) {
+        try {
+            // 验证API密钥格式
+            const validation = window.securityUtils.validateApiKeyFormat(apiKey);
+            if (!validation.valid) {
+                this.showMessage(`API密钥格式无效: ${validation.reason}`, 'error');
+                return;
+            }
+
+            // 设置到API客户端
+            if (window.nanoBananaClient) {
+                await window.nanoBananaClient.setUserApiKey(apiKey);
+            }
+
+            // 保存到本地存储
+            localStorage.setItem('user_api_key', apiKey);
+
+            // 更新界面
+            await this.checkApiKeyStatus();
+
+            // 关闭模态框
+            this.closeModal(modal);
+
+            this.showMessage('用户API密钥设置成功！', 'success');
+
+        } catch (error) {
+            console.error('设置用户API密钥失败:', error);
+            this.showMessage('设置API密钥失败', 'error');
+        }
+    }
+
+    /**
+     * 关闭模态框
+     */
+    closeModal(modal) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        }, 300);
     }
 
     /**
@@ -647,6 +927,18 @@ class ChildrenLiteracyApp {
         // 编辑API密钥事件
         if (this.elements.editApiKey) {
             this.elements.editApiKey.addEventListener('click', () => this.editApiKey());
+        }
+
+        // 用户API密钥管理事件
+        const setUserBtn = document.getElementById('setUserApiKey');
+        const clearUserBtn = document.getElementById('clearUserApiKey');
+
+        if (setUserBtn) {
+            setUserBtn.addEventListener('click', () => this.showUserApiKeySetup());
+        }
+
+        if (clearUserBtn) {
+            clearUserBtn.addEventListener('click', () => this.clearUserApiKey());
         }
 
         // 历史记录事件
