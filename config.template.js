@@ -8,8 +8,9 @@ window.APP_CONFIG = {
     // Nano Banana Pro API 配置
     // ================================
     nanoBanana: {
-        apiKey: "{{NANO_BANANA_API_KEY}}",
+        apiKey: "", // 移除默认API密钥，要求用户提供
         apiEndpoint: "{{NANO_BANANA_API_ENDPOINT}}",
+        requireUserApiKey: true, // 强制要求用户提供API密钥
         defaultParams: {
             resolution: "{{DEFAULT_RESOLUTION}}",
             aspectRatio: "{{DEFAULT_ASPECT_RATIO}}",
@@ -28,12 +29,32 @@ window.APP_CONFIG = {
     },
 
     // ================================
+    // 使用量限制配置
+    // ================================
+    usage: {
+        dailyLimit: parseInt("{{DAILY_USAGE_LIMIT}}") || 100,
+        monthlyLimit: parseInt("{{MONTHLY_USAGE_LIMIT}}") || 3000,
+        enableUsageTracking: "{{ENABLE_USAGE_TRACKING}}" !== "false",
+        resetTime: "00:00:00", // 每日重置时间
+        warningThreshold: 0.8, // 达到80%时显示警告
+        currentUsage: {
+            daily: 0,
+            monthly: 0,
+            lastReset: {
+                daily: null,
+                monthly: null
+            }
+        }
+    },
+
+    // ================================
     // 功能开关
     // ================================
     features: {
         usageStats: "{{ENABLE_USAGE_STATS}}" !== "false",
         generationHistory: "{{ENABLE_GENERATION_HISTORY}}" !== "false",
-        customVocabulary: "{{ENABLE_CUSTOM_VOCABULARY}}" !== "false"
+        customVocabulary: "{{ENABLE_CUSTOM_VOCABULARY}}" !== "false",
+        enableUsageTracking: "{{ENABLE_USAGE_TRACKING}}" !== "false"
     },
 
     // ================================
@@ -154,6 +175,23 @@ window.APP_CONFIG = {
         outputFormat: {
             allowed: ["png", "jpg"],
             default: "png"
+        },
+        usage: {
+            dailyLimit: {
+                min: 1,
+                max: 10000,
+                default: 100
+            },
+            monthlyLimit: {
+                min: 10,
+                max: 100000,
+                default: 3000
+            },
+            warningThreshold: {
+                min: 0.1,
+                max: 1.0,
+                default: 0.8
+            }
         }
     },
 
@@ -167,18 +205,24 @@ window.APP_CONFIG = {
             networkError: "网络连接失败，请检查您的网络设置",
             apiError: "API调用失败，请稍后重试",
             configError: "配置错误，请检查环境变量设置",
-            browserUnsupported: "您的浏览器不支持某些必需功能，请升级浏览器"
+            browserUnsupported: "您的浏览器不支持某些必需功能，请升级浏览器",
+            dailyLimitExceeded: "今日使用次数已达上限，请明天再试",
+            monthlyLimitExceeded: "本月使用次数已达上限，请下月再试"
         },
         success: {
             configLoaded: "配置加载成功",
             apiKeySaved: "API密钥保存成功",
             imageGenerated: "图片生成成功",
-            imageDownloaded: "图片下载成功"
+            imageDownloaded: "图片下载成功",
+            usageReset: "使用量统计已重置"
         },
         warnings: {
             apiKeyDeprecated: "API密钥可能已过期，请检查",
             browserLimited: "您的浏览器功能有限，某些特性可能不可用",
-            storageQuota: "本地存储空间不足，建议清理历史记录"
+            storageQuota: "本地存储空间不足，建议清理历史记录",
+            dailyLimitWarning: "今日使用次数即将达到上限",
+            monthlyLimitWarning: "本月使用次数即将达到上限",
+            usageTrackingDisabled: "使用量追踪功能已关闭"
         }
     },
 
@@ -201,10 +245,19 @@ window.validateConfig = function() {
     const warnings = [];
 
     // 验证API密钥
-    if (!config.nanoBanana.apiKey || config.nanoBanana.apiKey === "{{NANO_BANANA_API_KEY}}") {
-        errors.push(config.messages.errors.apiKeyMissing);
-    } else if (!config.validation.apiKey.pattern.test(config.nanoBanana.apiKey)) {
-        errors.push(config.messages.errors.apiKeyInvalid);
+    if (config.nanoBanana.requireUserApiKey) {
+        // 如果要求用户提供API密钥，则不要求默认密钥存在
+        if (config.nanoBanana.apiKey && config.nanoBanana.apiKey !== "" && !config.validation.apiKey.pattern.test(config.nanoBanana.apiKey)) {
+            errors.push(config.messages.errors.apiKeyInvalid);
+        }
+        // 不检查默认API密钥是否存在
+    } else {
+        // 如果不要求用户密钥，则必须有默认密钥
+        if (!config.nanoBanana.apiKey || config.nanoBanana.apiKey === "{{NANO_BANANA_API_KEY}}" || config.nanoBanana.apiKey === "") {
+            errors.push(config.messages.errors.apiKeyMissing);
+        } else if (!config.validation.apiKey.pattern.test(config.nanoBanana.apiKey)) {
+            errors.push(config.messages.errors.apiKeyInvalid);
+        }
     }
 
     // 验证API端点
@@ -228,6 +281,37 @@ window.validateConfig = function() {
         config.nanoBanana.defaultParams.outputFormat = config.validation.outputFormat.default;
     }
 
+    // 验证使用量限制配置
+    const usageValidation = config.validation.usage;
+
+    if (config.usage.dailyLimit < usageValidation.dailyLimit.min ||
+        config.usage.dailyLimit > usageValidation.dailyLimit.max) {
+        warnings.push(`日使用量限制超出合理范围，将使用默认值 ${usageValidation.dailyLimit.default}`);
+        config.usage.dailyLimit = usageValidation.dailyLimit.default;
+    }
+
+    if (config.usage.monthlyLimit < usageValidation.monthlyLimit.min ||
+        config.usage.monthlyLimit > usageValidation.monthlyLimit.max) {
+        warnings.push(`月使用量限制超出合理范围，将使用默认值 ${usageValidation.monthlyLimit.default}`);
+        config.usage.monthlyLimit = usageValidation.monthlyLimit.default;
+    }
+
+    if (config.usage.warningThreshold < usageValidation.warningThreshold.min ||
+        config.usage.warningThreshold > usageValidation.warningThreshold.max) {
+        warnings.push(`警告阈值超出合理范围，将使用默认值 ${usageValidation.warningThreshold.default}`);
+        config.usage.warningThreshold = usageValidation.warningThreshold.default;
+    }
+
+    // 验证月限制必须大于日限制
+    if (config.usage.monthlyLimit < config.usage.dailyLimit) {
+        errors.push("月使用量限制必须大于或等于日使用量限制");
+    }
+
+    // 检查使用量追踪功能是否启用
+    if (!config.usage.enableUsageTracking) {
+        warnings.push("使用量追踪功能已关闭，无法记录使用统计");
+    }
+
     // 检查浏览器支持
     if (!config.runtime.apiSupport.fetch) {
         errors.push(config.messages.errors.browserUnsupported);
@@ -235,6 +319,11 @@ window.validateConfig = function() {
 
     if (!config.runtime.storage.localStorage) {
         warnings.push(config.messages.warnings.browserLimited);
+
+        // 如果没有本地存储，提醒使用量追踪可能受限
+        if (config.usage.enableUsageTracking) {
+            warnings.push("由于浏览器不支持本地存储，使用量追踪功能可能受限");
+        }
     }
 
     return {

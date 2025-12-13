@@ -88,15 +88,22 @@
   - 使用项目现有的设计系统和CSS变量
   - 提供了良好的用户体验和可访问性
 
-#### 任务5：更新配置文件
+#### 任务5：更新配置文件 ✅
 - **文件**：`config.template.js`
 - **内容**：
-  - [ ] 移除默认API密钥
-  - [ ] 添加 `requireUserApiKey: true` 配置
-  - [ ] 添加 `freeDailyLimit: 50` 配置
-  - [ ] 添加 `enableUsageTracking: true` 配置
+  - [x] 移除默认API密钥
+  - [x] 添加 `requireUserApiKey: true` 配置
+  - [x] 添加 `freeDailyLimit: 50` 配置
+  - [x] 添加 `enableUsageTracking: true` 配置
 - **优先级**：中
 - **预计时间**：0.5小时
+- **完成时间**：2025-12-14
+- **完成说明**：
+  - 已移除默认API密钥，将 apiKey 设置为空字符串
+  - 已添加 requireUserApiKey: true 配置，强制要求用户提供API密钥
+  - 已添加每日使用量限制配置，支持环境变量 DAILY_USAGE_LIMIT，默认值为100
+  - 已添加 enableUsageTracking: true 配置，启用使用量追踪功能
+  - 配置文件支持灵活的环境变量替换和默认值设置
 
 ### 1.2 安全增强
 
