@@ -45,7 +45,18 @@ class ChildrenLiteracyApp {
             // 恢复上次状态
             await this.restoreLastState();
 
-            // 检查API配置
+            // 检查用户API密钥
+            const hasApiKey = await this.checkUserApiKey();
+
+            if (!hasApiKey) {
+                // 显示API密钥设置界面
+                this.showApiKeySetupModal();
+                this.hideLoading();
+                this.initialized = true;
+                return;
+            }
+
+            // 检查API配置（仅在用户有密钥时执行）
             await this.checkAPIConfiguration();
 
             this.initialized = true;
@@ -61,6 +72,460 @@ class ChildrenLiteracyApp {
             console.error('应用初始化失败:', error);
             this.hideLoading();
             this.showInitializationError(error);
+        }
+    }
+
+    /**
+     * 检查用户API密钥
+     */
+    async checkUserApiKey() {
+        try {
+            console.log('检查用户API密钥...');
+
+            // 从本地存储检查是否有保存的API密钥
+            const savedApiKey = localStorage.getItem('user_api_key');
+
+            if (!savedApiKey) {
+                console.log('未找到用户API密钥');
+                return false;
+            }
+
+            // 验证API密钥格式
+            const validation = window.securityUtils.validateApiKeyFormat(savedApiKey);
+            if (!validation.valid) {
+                console.warn('API密钥格式无效:', validation.reason);
+                localStorage.removeItem('user_api_key');
+                return false;
+            }
+
+            console.log('找到有效的用户API密钥');
+
+            // 设置到API客户端
+            if (window.nanoBananaClient && typeof window.nanoBananaClient.setUserApiKey === 'function') {
+                await window.nanoBananaClient.setUserApiKey(savedApiKey);
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('检查用户API密钥失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 显示API密钥设置模态框
+     */
+    showApiKeySetupModal() {
+        try {
+            console.log('显示API密钥设置模态框...');
+
+            // 创建模态框HTML
+            const modalHtml = `
+                <div class="api-key-setup-modal" style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.6);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                ">
+                    <div class="api-key-setup-card" style="
+                        background: white;
+                        border-radius: 12px;
+                        padding: 30px;
+                        max-width: 500px;
+                        width: 90%;
+                        max-height: 80vh;
+                        overflow-y: auto;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+                    ">
+                        <div class="setup-header" style="text-align: center; margin-bottom: 25px;">
+                            <h2 style="color: #4ECDC4; margin-bottom: 10px;">
+                                <i class="fas fa-key"></i> 设置API密钥
+                            </h2>
+                            <p style="color: #666; margin: 0;">
+                                欢迎使用儿童识字小报生成器！<br>
+                                请先设置您的Nano Banana Pro API密钥以开始使用。
+                            </p>
+                        </div>
+
+                        <div class="step" style="margin-bottom: 20px;">
+                            <h3 style="color: #333; margin-bottom: 15px;">
+                                <span style="display: inline-flex; align-items: center; justify-content: center;
+                                           width: 24px; height: 24px; background: #4ECDC4; color: white;
+                                           border-radius: 50%; font-size: 12px; margin-right: 8px;">1</span>
+                                获取API密钥
+                            </h3>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                                <p style="margin: 0 0 10px 0; color: #333;">
+                                    请访问 <a href="#" onclick="window.open('https://nano.banana.pro', '_blank')"
+                                             style="color: #4ECDC4; text-decoration: none;">Nano Banana Pro官网</a>
+                                    注册账号并获取API密钥。
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="step" style="margin-bottom: 20px;">
+                            <h3 style="color: #333; margin-bottom: 15px;">
+                                <span style="display: inline-flex; align-items: center; justify-content: center;
+                                           width: 24px; height: 24px; background: #4ECDC4; color: white;
+                                           border-radius: 50%; font-size: 12px; margin-right: 8px;">2</span>
+                                输入API密钥
+                            </h3>
+                            <div class="input-group">
+                                <div style="position: relative; margin-bottom: 10px;">
+                                    <input type="password"
+                                           id="userApiKeyInput"
+                                           placeholder="请输入您的API密钥"
+                                           style="width: 100%; padding: 12px 45px 12px 15px; border: 2px solid #e1e8ed;
+                                                  border-radius: 8px; font-size: 14px; font-family: monospace;
+                                                  transition: border-color 0.3s;"
+                                           onfocus="this.style.borderColor='#4ECDC4'"
+                                           onblur="this.style.borderColor='#e1e8ed'">
+                                    <button type="button"
+                                            onclick="window.app.toggleUserApiKeyVisibility()"
+                                            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                                                   background: none; border: none; color: #666; cursor: pointer;
+                                                   padding: 5px;">
+                                        <i class="fas fa-eye" id="userApiKeyToggleIcon"></i>
+                                    </button>
+                                </div>
+                                <div id="userApiKeyError" style="color: #ff7675; font-size: 12px; margin-top: 5px; display: none;">
+                                    API密钥格式不正确
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="security-notice" style="
+                            background: #fff3cd;
+                            border: 1px solid #ffeaa7;
+                            border-radius: 8px;
+                            padding: 15px;
+                            margin-bottom: 20px;
+                        ">
+                            <h4 style="color: #f39c12; margin: 0 0 8px 0; font-size: 14px;">
+                                <i class="fas fa-shield-alt"></i> 安全提示
+                            </h4>
+                            <ul style="margin: 0; padding-left: 20px; color: #666; font-size: 13px;">
+                                <li>API密钥将安全保存在您的浏览器本地</li>
+                                <li>我们不会上传或共享您的API密钥</li>
+                                <li>请妥善保管您的API密钥，不要泄露给他人</li>
+                            </ul>
+                        </div>
+
+                        <div class="setup-actions" style="display: flex; gap: 10px; justify-content: center;">
+                            <button type="button"
+                                    onclick="window.app.showApiKeyGuide()"
+                                    style="padding: 10px 20px; background: #f8f9fa; color: #666; border: 1px solid #dee2e6;
+                                           border-radius: 6px; cursor: pointer; font-size: 14px;">
+                                <i class="fas fa-question-circle"></i> 获取帮助
+                            </button>
+                            <button type="button"
+                                    id="saveUserApiKeyBtn"
+                                    onclick="window.app.saveUserApiKey()"
+                                    style="padding: 10px 20px; background: #4ECDC4; color: white; border: none;
+                                           border-radius: 6px; cursor: pointer; font-size: 14px;">
+                                <i class="fas fa-save"></i> 保存并开始使用
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 添加到页面
+            const modal = document.createElement('div');
+            modal.id = 'apiKeySetupModal';
+            modal.innerHTML = modalHtml;
+            document.body.appendChild(modal);
+
+            // 聚焦到输入框
+            setTimeout(() => {
+                document.getElementById('userApiKeyInput').focus();
+            }, 100);
+
+            // 绑定Enter键保存
+            document.getElementById('userApiKeyInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.saveUserApiKey();
+                }
+            });
+
+            this.showMessage('请设置API密钥以开始使用', 'info');
+
+        } catch (error) {
+            console.error('显示API密钥设置模态框失败:', error);
+            this.showMessage('显示设置界面失败', 'error');
+        }
+    }
+
+    /**
+     * 保存用户API密钥
+     */
+    async saveUserApiKey() {
+        try {
+            const input = document.getElementById('userApiKeyInput');
+            const errorDiv = document.getElementById('userApiKeyError');
+            const saveBtn = document.getElementById('saveUserApiKeyBtn');
+
+            const apiKey = input.value.trim();
+
+            // 验证输入
+            const validation = this.validateApiKeyInput(apiKey);
+            if (!validation.isValid) {
+                errorDiv.textContent = validation.error;
+                errorDiv.style.display = 'block';
+                input.focus();
+                return;
+            }
+
+            // 隐藏错误信息
+            errorDiv.style.display = 'none';
+
+            // 禁用保存按钮，显示加载状态
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 验证中...';
+
+            // 验证API密钥有效性（可选）
+            const isValid = await this.verifyApiKeyValidity(apiKey);
+            if (!isValid) {
+                errorDiv.textContent = 'API密钥验证失败，请检查密钥是否正确';
+                errorDiv.style.display = 'block';
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存并开始使用';
+                input.focus();
+                return;
+            }
+
+            // 保存API密钥
+            await this.storeUserApiKey(apiKey);
+
+            // 设置到API客户端
+            if (window.nanoBananaClient && typeof window.nanoBananaClient.setUserApiKey === 'function') {
+                await window.nanoBananaClient.setUserApiKey(apiKey);
+            }
+
+            // 移除模态框
+            const modal = document.getElementById('apiKeySetupModal');
+            if (modal) {
+                modal.remove();
+            }
+
+            this.showMessage('API密钥设置成功！', 'success');
+
+            // 继续初始化流程
+            await this.continueInitializationAfterApiKey();
+
+        } catch (error) {
+            console.error('保存用户API密钥失败:', error);
+
+            const errorDiv = document.getElementById('userApiKeyError');
+            const saveBtn = document.getElementById('saveUserApiKeyBtn');
+
+            errorDiv.textContent = '保存失败，请重试';
+            errorDiv.style.display = 'block';
+
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存并开始使用';
+        }
+    }
+
+    /**
+     * 验证API密钥输入
+     */
+    validateApiKeyInput(apiKey) {
+        if (!apiKey) {
+            return { isValid: false, error: '请输入API密钥' };
+        }
+
+        // 使用安全工具验证格式
+        const validation = window.securityUtils.validateApiKeyFormat(apiKey);
+        if (!validation.valid) {
+            return { isValid: false, error: `API密钥格式无效: ${validation.reason}` };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * 验证API密钥有效性
+     */
+    async verifyApiKeyValidity(apiKey) {
+        try {
+            // 这里可以调用API验证密钥是否有效
+            // 暂时跳过实际验证，只检查格式
+            console.log('API密钥格式验证通过');
+            return true;
+        } catch (error) {
+            console.error('API密钥验证失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 存储用户API密钥
+     */
+    async storeUserApiKey(apiKey) {
+        try {
+            localStorage.setItem('user_api_key', apiKey);
+            console.log('API密钥已保存到本地存储');
+        } catch (error) {
+            console.error('保存API密钥失败:', error);
+            throw new Error('保存API密钥失败');
+        }
+    }
+
+    /**
+     * 加载用户API密钥
+     */
+    loadUserApiKey() {
+        try {
+            return localStorage.getItem('user_api_key');
+        } catch (error) {
+            console.error('加载API密钥失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 清除用户API密钥
+     */
+    clearUserApiKey() {
+        try {
+            localStorage.removeItem('user_api_key');
+            console.log('API密钥已清除');
+        } catch (error) {
+            console.error('清除API密钥失败:', error);
+        }
+    }
+
+    /**
+     * 切换用户API密钥可见性
+     */
+    toggleUserApiKeyVisibility() {
+        try {
+            const input = document.getElementById('userApiKeyInput');
+            const icon = document.getElementById('userApiKeyToggleIcon');
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        } catch (error) {
+            console.error('切换API密钥可见性失败:', error);
+        }
+    }
+
+    /**
+     * 显示API密钥获取指南
+     */
+    showApiKeyGuide() {
+        const guideHtml = `
+            <div style="max-width: 600px; text-align: left;">
+                <h3 style="color: #4ECDC4; margin-bottom: 20px;">
+                    <i class="fas fa-question-circle"></i> API密钥获取指南
+                </h3>
+
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #333; margin-bottom: 10px;">步骤1：注册账号</h4>
+                    <ol style="color: #666; padding-left: 20px; line-height: 1.6;">
+                        <li>访问 <a href="https://nano.banana.pro" target="_blank" style="color: #4ECDC4;">Nano Banana Pro官网</a></li>
+                        <li>点击"注册"按钮创建账号</li>
+                        <li>完成邮箱验证</li>
+                    </ol>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #333; margin-bottom: 10px;">步骤2：获取API密钥</h4>
+                    <ol style="color: #666; padding-left: 20px; line-height: 1.6;">
+                        <li>登录到控制台</li>
+                        <li>进入"API管理"页面</li>
+                        <li>点击"生成新密钥"</li>
+                        <li>复制生成的API密钥</li>
+                    </ol>
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="color: #f39c12; margin-bottom: 10px;">
+                        <i class="fas fa-lightbulb"></i> 温馨提示
+                    </h4>
+                    <ul style="color: #666; margin: 0; padding-left: 20px; line-height: 1.6;">
+                        <li>API密钥是一串长字符串，通常以"sk-"开头</li>
+                        <li>请妥善保管您的API密钥，不要泄露给他人</li>
+                        <li>如果密钥泄露，请及时在控制台重新生成</li>
+                        <li>API密钥会保存在您的浏览器本地，我们不会上传</li>
+                    </ul>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px;">
+                    <button onclick="this.closest('.confirm-dialog').remove(); window.open('https://nano.banana.pro', '_blank');"
+                            style="padding: 10px 20px; background: #4ECDC4; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">
+                        <i class="fas fa-external-link-alt"></i> 前往官网
+                    </button>
+                    <button onclick="this.closest('.confirm-dialog').remove();"
+                            style="padding: 10px 20px; background: #f8f9fa; color: #666; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer;">
+                        <i class="fas fa-times"></i> 关闭
+                    </button>
+                </div>
+            </div>
+        `;
+
+        this.showDetailedMessage(guideHtml, 'info');
+    }
+
+    /**
+     * 显示API密钥错误
+     */
+    showApiKeyError(message, type = 'error') {
+        try {
+            // 检查是否有设置模态框，如果有则在其中显示错误
+            const errorDiv = document.getElementById('userApiKeyError');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+
+                // 聚焦到输入框
+                const input = document.getElementById('userApiKeyInput');
+                if (input) {
+                    input.focus();
+                }
+                return;
+            }
+
+            // 如果没有模态框，显示全局错误消息
+            this.showMessage(message, type);
+
+        } catch (error) {
+            console.error('显示API密钥错误失败:', error);
+            // 降级显示
+            this.showMessage(message, 'error');
+        }
+    }
+
+    /**
+     * 在API密钥设置完成后继续初始化
+     */
+    async continueInitializationAfterApiKey() {
+        try {
+            // 检查API配置
+            await this.checkAPIConfiguration();
+
+            // 显示初始化完成消息
+            this.showMessage('应用初始化完成', 'success');
+
+            // 检查是否是分享链接
+            this.checkShareLink();
+
+        } catch (error) {
+            console.error('API密钥设置后继续初始化失败:', error);
+            this.showMessage('初始化过程中出现错误', 'error');
         }
     }
 
