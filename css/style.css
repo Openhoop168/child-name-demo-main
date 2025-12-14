@@ -52,6 +52,14 @@ body {
     text-align: center;
     margin-bottom: 40px;
     color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+}
+
+.header-left {
+    text-align: left;
 }
 
 .header h1 {
@@ -70,6 +78,55 @@ body {
     font-size: 1.2rem;
     opacity: 0.9;
     font-weight: 300;
+}
+
+/* 使用量显示样式 */
+.usage-display {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    padding: 10px 15px;
+    backdrop-filter: blur(10px);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.usage-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.usage-daily,
+.usage-monthly {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.usage-display.usage-near-limit {
+    background: rgba(255,193,7,0.2);
+    border-color: rgba(255,193,7,0.5);
+    animation: pulse 2s infinite;
+}
+
+.usage-display.usage-limit-reached {
+    background: rgba(255,99,71,0.2);
+    border-color: rgba(255,99,71,0.5);
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
 }
 
 /* 主要内容区域 */
@@ -655,6 +712,16 @@ body {
 @media (max-width: 768px) {
     .container {
         padding: 15px;
+    }
+
+    .header {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+
+    .header-left {
+        text-align: center;
     }
 
     .header h1 {

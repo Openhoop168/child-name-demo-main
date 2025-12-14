@@ -816,6 +816,7 @@ class ChildrenLiteracyApp {
         const modules = [
             { name: '词汇管理器', instance: window.vocabularyManager },
             { name: '存储管理器', instance: window.storageManager },
+            { name: '使用量追踪器', instance: window.usageTracker },
             { name: '安全工具', instance: window.securityUtils },
             { name: 'API客户端', instance: window.nanoBananaClient }
         ];
@@ -823,10 +824,17 @@ class ChildrenLiteracyApp {
         for (const module of modules) {
             if (module.instance) {
                 console.log(`初始化${module.name}...`);
-                await module.instance.initialize();
+                if (module.instance.initialize && typeof module.instance.initialize === 'function') {
+                    await module.instance.initialize();
+                }
             } else {
                 console.warn(`${module.name}未找到`);
             }
+        }
+
+        // 初始化使用量显示
+        if (window.usageTracker) {
+            window.usageTracker.updateUsageDisplay();
         }
     }
 
@@ -1080,6 +1088,24 @@ class ChildrenLiteracyApp {
                 return;
             }
 
+            // 检查使用量限制
+            if (window.usageTracker) {
+                const usage = window.usageTracker.getUsage();
+                if (!window.usageTracker.checkDailyLimit()) {
+                    this.showMessage('今日使用次数已达上限，请明天再试', 'error');
+                    this.isGenerating = false;
+                    this.updateGenerateButtonState(false);
+                    this.goToStep(2);
+                    return;
+                }
+
+                // 检查是否接近限制
+                if (window.usageTracker.isNearLimit()) {
+                    const remaining = usage.daily.remaining;
+                    this.showMessage(`今日剩余生成次数仅剩 ${remaining} 次`, 'warning');
+                }
+            }
+
             // 清空日志
             this.clearLogs();
 
@@ -1206,6 +1232,15 @@ class ChildrenLiteracyApp {
 
             // 更新使用统计
             window.nanoBananaClient.updateUsageStats(true);
+
+            // 追踪使用量
+            if (window.usageTracker) {
+                window.usageTracker.trackGeneration({
+                    taskId: this.currentTaskId,
+                    theme: this.currentPromptData.metadata.theme,
+                    timestamp: new Date().toISOString()
+                });
+            }
 
             // 等待图片加载完成后进入下一步
             this.elements.generatedImage.onload = () => {
