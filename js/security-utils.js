@@ -278,6 +278,385 @@ class SecurityUtils {
     }
 
     /**
+     * 增强的HTML清理函数 - 防止XSS攻击
+     */
+    sanitizeHtml(html) {
+        if (typeof html !== 'string') {
+            return '';
+        }
+
+        // 移除危险标签和属性
+        let sanitized = html
+            // 移除script标签及其内容
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            // 移除iframe标签
+            .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+            // 移除object标签
+            .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+            // 移除embed标签
+            .replace(/<embed\b[^>]*>/gi, '')
+            // 移除form标签
+            .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
+            // 移除input标签
+            .replace(/<input\b[^>]*>/gi, '')
+            // 移除textarea标签
+            .replace(/<textarea\b[^<]*(?:(?!<\/textarea>)<[^<]*)*<\/textarea>/gi, '')
+            // 移除button标签
+            .replace(/<button\b[^<]*(?:(?!<\/button>)<[^<]*)*<\/button>/gi, '')
+            // 移除meta标签
+            .replace(/<meta\b[^>]*>/gi, '')
+            // 移除link标签
+            .replace(/<link\b[^>]*>/gi, '')
+            // 移除style标签（保留内容但移除危险内容）
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+        // 移除所有on*事件属性（onclick, onerror等）
+        sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+        sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^>\s]*/gi, '');
+
+        // 移除危险的HTML属性
+        const dangerousAttributes = [
+            'javascript:', 'vbscript:', 'data:', 'src', 'href', 'action',
+            'background', 'codebase', 'dynsrc', 'lowsrc', 'style', 'classid',
+            'clsid', 'data', 'archive', 'usemap', 'ismap', 'formaction'
+        ];
+
+        dangerousAttributes.forEach(attr => {
+            const regex = new RegExp(`\\s+${attr}\\s*=\\s*["'][^"']*["']`, 'gi');
+            sanitized = sanitized.replace(regex, '');
+            const regex2 = new RegExp(`\\s+${attr}\\s*=\\s*[^>\\s]*`, 'gi');
+            sanitized = sanitized.replace(regex2, '');
+        });
+
+        // 移除CSS表达式和危险CSS
+        sanitized = sanitized.replace(/expression\s*\(/gi, '');
+        sanitized = sanitized.replace(/javascript\s*:/gi, '');
+        sanitized = sanitized.replace(/vbscript\s*:/gi, '');
+        sanitized = sanitized.replace(/data\s*:/gi, '');
+
+        // 移除HTML注释（可能包含恶意代码）
+        sanitized = sanitized.replace(/<!--[\s\S]*?-->/g, '');
+
+        // 基本的HTML转义
+        sanitized = sanitized
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\//g, '&#x2F;');
+
+        return sanitized.trim();
+    }
+
+    /**
+     * 验证用户内容 - 综合安全检查
+     */
+    validateUserContent(content, type = 'text') {
+        if (typeof content !== 'string') {
+            return {
+                valid: false,
+                reason: '内容必须是字符串',
+                cleanedContent: ''
+            };
+        }
+
+        // 检查长度
+        const lengthValidation = this.validateInputLength(content, 1, 10000);
+        if (!lengthValidation.valid) {
+            return {
+                valid: false,
+                reason: lengthValidation.reason,
+                cleanedContent: ''
+            };
+        }
+
+        // 检查内容安全性
+        const safetyCheck = this.checkContentSafety(content);
+        if (!safetyCheck.safe) {
+            return {
+                valid: false,
+                reason: safetyCheck.reason,
+                cleanedContent: this.sanitizeHtml(content)
+            };
+        }
+
+        // 额外的XSS防护检查
+        const xssPatterns = [
+            // 基础XSS模式
+            /<[^>]*script[^>]*>.*?<\/[^>]*script[^>]*>/gi,
+            /<[^>]*iframe[^>]*>.*?<\/[^>]*iframe[^>]*>/gi,
+            /<[^>]*object[^>]*>.*?<\/[^>]*object[^>]*>/gi,
+            /<[^>]*embed[^>]*>/gi,
+
+            // 事件处理器
+            /on\w+\s*=\s*["'][^"']*["']/gi,
+            /on\w+\s*=\s*[^>\s]*/gi,
+
+            // JavaScript协议
+            /javascript\s*:/gi,
+            /vbscript\s*:/gi,
+            /data\s*:\s*text\/html/gi,
+
+            // CSS表达式
+            /expression\s*\(/gi,
+
+            // Meta标签注入
+            /<meta[^>]*http-equiv[^>]*refresh/gi,
+            /<meta[^>]*content[^>]*url/gi,
+
+            // DOM注入
+            /document\.(?:write|writeln|cookie|location|open|close)/gi,
+            /window\.(?:location|open|close|alert|confirm|prompt)/gi,
+
+            // 评估函数
+            /eval\s*\(/gi,
+            /setTimeout\s*\(/gi,
+            /setInterval\s*\(/gi,
+
+            // 其他危险模式
+            /@import/gi,
+            /binding\s*:/gi,
+            /behavior\s*:/gi,
+            /-moz-binding/gi
+        ];
+
+        for (const pattern of xssPatterns) {
+            if (pattern.test(content)) {
+                return {
+                    valid: false,
+                    reason: '内容包含潜在的XSS攻击代码',
+                    cleanedContent: this.sanitizeHtml(content)
+                };
+            }
+        }
+
+        // SQL注入检查（如果内容可能用于数据库查询）
+        const sqlPatterns = [
+            /union\s+select/gi,
+            /drop\s+table/gi,
+            /delete\s+from/gi,
+            /insert\s+into/gi,
+            /update\s+\w+\s+set/gi,
+            /create\s+table/gi,
+            /alter\s+table/gi,
+            /exec\s*\(/gi,
+            /execute\s*\(/gi,
+            /xp_cmdshell/gi,
+            /sp_executesql/gi
+        ];
+
+        for (const pattern of sqlPatterns) {
+            if (pattern.test(content)) {
+                return {
+                    valid: false,
+                    reason: '内容包含潜在的SQL注入代码',
+                    cleanedContent: this.sanitizeHtml(content)
+                };
+            }
+        }
+
+        // 命令注入检查
+        const commandPatterns = [
+            /\|\s*[^|]*\|/g,  // 管道命令
+            /&&[^&]*&&/g,     // AND命令
+            /;\s*\w+/g,      // 分号命令
+            /\$\([^)]*\)/g,  // 命令替换
+            /`[^`]*`/g,      // 反引号命令
+            /\.\./g,         // 路径遍历
+            /[\/\\]\./g,     // 隐藏文件访问
+        ];
+
+        for (const pattern of commandPatterns) {
+            if (pattern.test(content)) {
+                return {
+                    valid: false,
+                    reason: '内容包含潜在的命令注入代码',
+                    cleanedContent: this.sanitizeHtml(content)
+                };
+            }
+        }
+
+        // 内容类型特定验证
+        let cleanedContent = content;
+
+        switch (type) {
+            case 'html':
+                cleanedContent = this.sanitizeHtml(content);
+                break;
+            case 'text':
+                cleanedContent = this.sanitizeInput(content);
+                break;
+            case 'prompt':
+                // AI提示词需要特殊处理，移除可能的安全风险
+                cleanedContent = this.sanitizePromptContent(content);
+                break;
+            default:
+                cleanedContent = this.sanitizeInput(content);
+        }
+
+        // 检查清理后是否还有内容
+        if (!cleanedContent || cleanedContent.trim().length === 0) {
+            return {
+                valid: false,
+                reason: '清理后内容为空',
+                cleanedContent: ''
+            };
+        }
+
+        return {
+            valid: true,
+            cleanedContent: cleanedContent,
+            originalLength: content.length,
+            cleanedLength: cleanedContent.length
+        };
+    }
+
+    /**
+     * 清理AI提示词内容 - 专门用于AI提示词
+     */
+    sanitizePromptContent(prompt) {
+        if (typeof prompt !== 'string') {
+            return '';
+        }
+
+        let cleaned = prompt;
+
+        // 移除可能影响AI模型安全性的内容
+        const unsafePatterns = [
+            // 忽略指令模式
+            /ignore\s+(?:previous|all)\s+(?:instructions|prompts?)/gi,
+            /disregard\s+(?:previous|all)\s+(?:instructions|prompts?)/gi,
+            /forget\s+(?:previous|all)\s+(?:instructions|prompts?)/gi,
+
+            // 系统提示注入
+            /system\s*:\s*/gi,
+            /assistant\s*:\s*/gi,
+            /developer\s*:\s*/gi,
+
+            // 角色扮演注入
+            /you\s+are\s+(?:no\s+longer|not)/gi,
+            /act\s+as\s+(?:if\s+)?you\s+are/gi,
+            /pretend\s+(?:to\s+be|that\s+you\s+are)/gi,
+
+            // 信息泄露尝试
+            /tell\s+me\s+about/gi,
+            /show\s+me\s+(?:your|the)\s+(?:prompt|instructions|system)/gi,
+            /what\s+(?:do\s+)?you\s+know\s+about/gi,
+
+            // 危险请求
+            /(?:generate|create|write|provide)\s+(?:code|script|program)/gi,
+            /hack|exploit|bypass|circumvent/gi,
+            /malware|virus|trojan|ransomware/gi
+        ];
+
+        for (const pattern of unsafePatterns) {
+            cleaned = cleaned.replace(pattern, '[REMOVED_CONTENT]');
+        }
+
+        // 移除或替换敏感信息
+        cleaned = cleaned.replace(/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, '[CARD_NUMBER]');
+        cleaned = cleaned.replace(/\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, '[SSN]');
+        cleaned = cleaned.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL]');
+        cleaned = cleaned.replace(/\b\d{3}-\d{3}-\d{4}\b/g, '[PHONE_NUMBER]');
+
+        // 移除URL
+        cleaned = cleaned.replace(/https?:\/\/[^\s<>"']+/gi, '[URL]');
+        cleaned = cleaned.replace(/www\.[^\s<>"']+/gi, '[URL]');
+
+        return cleaned.trim();
+    }
+
+    /**
+     * 高级XSS检测 - 使用更复杂的方法检测XSS
+     */
+    advancedXSSDetection(content) {
+        if (typeof content !== 'string') {
+            return { safe: false, reason: '内容必须是字符串' };
+        }
+
+        // 解码HTML实体
+        const decodedContent = this.decodeHtmlEntities(content);
+
+        // 检查编码后的内容
+        const xssPatterns = [
+            // 编码的脚本标签
+            /%3cscript%3e/gi,
+            /%3c\/script%3e/gi,
+
+            // Unicode编码
+            /\\u003cscript\\u003e/gi,
+            /\\u003c\\/script\\u003e/gi,
+
+            // Hex编码
+            /&#x3c;script&#x3e;/gi,
+            /&#x3c;\/script&#x3e;/gi,
+
+            // 混合编码
+            /%3c\\u003cscript/gi,
+
+            // 基于字符的混淆
+            /<s[cC][rR][iI][pP][tT]/g,
+            /<\\x73\\x63\\x72\\x69\\x70\\x74>/g
+        ];
+
+        for (const pattern of xssPatterns) {
+            if (pattern.test(decodedContent)) {
+                return { safe: false, reason: '检测到编码的XSS攻击' };
+            }
+        }
+
+        // 检查DOM-based XSS
+        if (this.checkDOMBasedXSS(decodedContent)) {
+            return { safe: false, reason: '检测到DOM-based XSS攻击' };
+        }
+
+        return { safe: true };
+    }
+
+    /**
+     * 检查DOM-based XSS
+     */
+    checkDOMBasedXSS(content) {
+        const domXSSPatterns = [
+            // DOM操作
+            /document\.(?:write|writeln)/gi,
+            /innerHTML\s*=/gi,
+            /outerHTML\s*=/gi,
+            /insertAdjacentHTML/gi,
+
+            // 脚本创建
+            /createElement\s*\(\s*["']script["']\s*\)/gi,
+            /setAttribute\s*\(\s*["']on\w+["']/gi,
+
+            // 事件监听器
+            /addEventListener\s*\(\s*["']on\w+/gi,
+            /attachEvent\s*\(\s*["']on\w+/gi,
+
+            // 位置操作
+            /location\.(?:href|hash|search|replace|assign)/gi,
+            /window\.(?:open|location)/gi,
+
+            // Cookie操作
+            /document\.\s*cookie/gi
+        ];
+
+        return domXSSPatterns.some(pattern => pattern.test(content));
+    }
+
+    /**
+     * 解码HTML实体
+     */
+    decodeHtmlEntities(text) {
+        if (typeof text !== 'string') {
+            return '';
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
+    }
+
+    /**
      * 验证输入长度
      */
     validateInputLength(input, minLength = 1, maxLength = 1000) {
