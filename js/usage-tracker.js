@@ -15,7 +15,8 @@ class UsageTracker {
         };
 
         // 下载控制配置
-        this.downloadConfig = window.getConfig ? window.getConfig('download') : {
+        const downloadConfig = window.getConfig ? window.getConfig('download') : null;
+        this.downloadConfig = downloadConfig ?? {
             dailyLimit: 50,
             monthlyLimit: 1000,
             enableDownloadTracking: true,
@@ -519,6 +520,54 @@ class UsageTracker {
     // ================================
 
     /**
+     * 构建下载使用量对象
+     * @param {Object} config - 下载配置
+     * @returns {Object} 下载使用量信息
+     */
+    buildDownloadUsageObject(config) {
+        // 确保 download 数据存在
+        if (!this.usageData.download) {
+            return {
+                daily: {
+                    count: 0,
+                    limit: config.dailyLimit,
+                    remaining: config.dailyLimit,
+                    percentage: 0
+                },
+                monthly: {
+                    count: 0,
+                    limit: config.monthlyLimit,
+                    remaining: config.monthlyLimit,
+                    percentage: 0
+                },
+                history: [],
+                isTrackingEnabled: config.enableDownloadTracking,
+                isNearLimit: false,
+                isLimitReached: false
+            };
+        }
+
+        return {
+            daily: {
+                count: this.usageData.download.daily.count,
+                limit: config.dailyLimit,
+                remaining: Math.max(0, config.dailyLimit - this.usageData.download.daily.count),
+                percentage: Math.min(100, (this.usageData.download.daily.count / config.dailyLimit) * 100)
+            },
+            monthly: {
+                count: this.usageData.download.monthly.count,
+                limit: config.monthlyLimit,
+                remaining: Math.max(0, config.monthlyLimit - this.usageData.download.monthly.count),
+                percentage: Math.min(100, (this.usageData.download.monthly.count / config.monthlyLimit) * 100)
+            },
+            history: this.usageData.download.history || [],
+            isTrackingEnabled: config.enableDownloadTracking,
+            isNearLimit: this.isNearDownloadLimit(),
+            isLimitReached: !this.checkDownloadLimit()
+        };
+    }
+
+    /**
      * 追踪下载操作
      * @param {Object} options - 下载选项
      * @returns {boolean} 是否允许下载
@@ -686,29 +735,24 @@ class UsageTracker {
      * @returns {Object} 下载使用量信息
      */
     getDownloadUsage() {
-        // 确保 download 数据存在
-        if (!this.usageData.download) {
-            console.warn('[UsageTracker] Download data not initialized, using defaults');
-            return {
-                daily: {
-                    count: 0,
-                    limit: this.downloadConfig.dailyLimit,
-                    remaining: this.downloadConfig.dailyLimit,
-                    percentage: 0
-                },
-                monthly: {
-                    count: 0,
-                    limit: this.downloadConfig.monthlyLimit,
-                    remaining: this.downloadConfig.monthlyLimit,
-                    percentage: 0
-                },
-                history: [],
-                isTrackingEnabled: this.downloadConfig.enableDownloadTracking,
-                isNearLimit: false,
-                isLimitReached: false
+        // 确保 download 配置存在
+        if (!this.downloadConfig) {
+            console.warn('[UsageTracker] Download config not initialized, using defaults');
+            const config = {
+                dailyLimit: 50,
+                monthlyLimit: 1000,
+                enableDownloadTracking: true,
+                warningThreshold: 0.8
             };
+            return this.buildDownloadUsageObject(config);
         }
 
+        // 确保 download 数据存在
+        if (!this.usageData.download) {
+            return this.buildDownloadUsageObject(this.downloadConfig);
+        }
+
+        // 使用实际的配置和数据
         return {
             daily: {
                 count: this.usageData.download.daily.count,
