@@ -184,18 +184,26 @@
 
 ### 2.1 使用量管理
 
-#### 任务10：创建使用量追踪模块
+#### 任务10：创建使用量追踪模块 ✅
 - **文件**：`js/usage-tracker.js`（新建）
 - **内容**：
-  - [ ] 创建 `UsageTracker` 类
-  - [ ] 实现 `trackGeneration()` 方法
-  - [ ] 实现 `checkDailyLimit()` 方法
-  - [ ] 实现 `getUsage()` 方法
-  - [ ] 实现 `saveUsage()` 方法
-  - [ ] 实现 `showNearLimitWarning()` 方法
-  - [ ] 实现 `showDailyLimitReached()` 方法
+  - [x] 创建 `UsageTracker` 类
+  - [x] 实现 `trackGeneration()` 方法
+  - [x] 实现 `checkDailyLimit()` 方法
+  - [x] 实现 `getUsage()` 方法
+  - [x] 实现 `saveUsage()` 方法
+  - [x] 实现 `showNearLimitWarning()` 方法
+  - [x] 实现 `showDailyLimitReached()` 方法
 - **优先级**：中
 - **预计时间**：4小时
+- **完成时间**：2025-12-15
+- **完成说明**：
+  - 已创建完整的 UsageTracker 类，支持日/月使用量追踪
+  - 实现了自动重置功能（每日/每月）
+  - 集成到主应用流程，生成前检查限制，生成后追踪使用量
+  - 添加了实时使用量显示UI，支持接近限制警告
+  - 通过了完整的单元测试（9个测试用例全部通过）
+  - 与现有 storageManager 系统集成，数据同步保存
 
 #### 任务11：集成使用量追踪
 - **文件**：`js/app.js`
