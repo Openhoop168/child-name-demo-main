@@ -698,36 +698,249 @@ class UsageTracker {
     showDownloadLimitReached() {
         // 确保 download 数据存在
         if (!this.usageData.download) {
-            const message = `下载次数已达上限，请明天再试。`;
-            if (window.app && window.app.showNotification) {
-                window.app.showNotification(message, 'error');
-            } else {
-                console.error(`[UsageTracker] ${message}`);
-                this.showTemporaryNotification(message, 'error');
-            }
+            this.showDownloadWarningNotification('下载次数已达上限，请明天再试。');
             return;
         }
 
         const isDailyLimit = this.usageData.download.daily.count >= this.downloadConfig.dailyLimit;
         const isMonthlyLimit = this.usageData.download.monthly.count >= this.downloadConfig.monthlyLimit;
+        const downloadUsage = this.getDownloadUsage();
 
-        let message;
+        // 尝试显示模态框，如果失败则显示简单通知
+        try {
+            this.showDownloadLimitModal(downloadUsage, isDailyLimit, isMonthlyLimit);
+        } catch (error) {
+            console.warn('[UsageTracker] 无法显示下载限制模态框:', error.message);
+
+            let message;
+            if (isDailyLimit && isMonthlyLimit) {
+                message = `今日和本月的下载次数均已达到上限，请明天或下月再试。`;
+            } else if (isDailyLimit) {
+                message = `今日下载次数已达上限（${this.downloadConfig.dailyLimit}次），请明天再试。`;
+            } else {
+                message = `本月下载次数已达上限（${this.downloadConfig.monthlyLimit}次），请下月再试。`;
+            }
+
+            this.showDownloadWarningNotification(message);
+        }
+    }
+
+    /**
+     * 显示下载限制模态框
+     */
+    showDownloadLimitModal(downloadUsage, isDailyLimit, isMonthlyLimit) {
+        // 检查是否已存在模态框
+        let existingModal = document.querySelector('.download-limit-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'modal download-limit-modal fade show';
+        modal.style.display = 'block';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modal.setAttribute('tabindex', '-1');
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-labelledby', 'downloadLimitModalTitle');
+        modal.setAttribute('aria-hidden', 'false');
+
+        const dailyStatus = isDailyLimit ? 'exceeded' : 'normal';
+        const monthlyStatus = isMonthlyLimit ? 'exceeded' : 'normal';
+        const dailyProgress = Math.min(downloadUsage.daily.percentage, 100);
+        const monthlyProgress = Math.min(downloadUsage.monthly.percentage, 100);
+
+        const modalHTML = `
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="downloadLimitModalTitle">
+                            <i class="fas fa-download download-limit-icon"></i>
+                            下载次数已满
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="download-limit-info">
+                            <div class="download-limit-row">
+                                <span class="label">今日下载：</span>
+                                <span class="value ${dailyStatus}">${downloadUsage.daily.count}/${downloadUsage.daily.limit}</span>
+                            </div>
+                            <div class="download-limit-progress">
+                                <div class="download-limit-progress-bar">
+                                    <div class="download-limit-progress-fill" style="width: ${dailyProgress}%"></div>
+                                </div>
+                            </div>
+                            <div class="download-limit-row">
+                                <span class="label">本月下载：</span>
+                                <span class="value ${monthlyStatus}">${downloadUsage.monthly.count}/${downloadUsage.monthly.limit}</span>
+                            </div>
+                            <div class="download-limit-progress">
+                                <div class="download-limit-progress-bar">
+                                    <div class="download-limit-progress-fill" style="width: ${monthlyProgress}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="download-limit-message">
+                            ${this.getDownloadLimitMessage(isDailyLimit, isMonthlyLimit)}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="download-limit-actions">
+                            ${this.getDownloadLimitActions(isDailyLimit, isMonthlyLimit)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modal.innerHTML = modalHTML;
+        document.body.appendChild(modal);
+
+        // 添加事件监听器
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeDownloadLimitModal();
+            }
+        });
+
+        // ESC键关闭
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                this.closeDownloadLimitModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // 防止body滚动
+        document.body.style.overflow = 'hidden';
+        modal.style.overflowY = 'auto';
+
+        // 聚焦到模态框
+        setTimeout(() => {
+            modal.focus();
+        }, 100);
+    }
+
+    /**
+     * 获取下载限制提示消息
+     */
+    getDownloadLimitMessage(isDailyLimit, isMonthlyLimit) {
         if (isDailyLimit && isMonthlyLimit) {
-            message = `今日和本月的下载次数均已达到上限，请明天或下月再试。`;
+            return `
+                <div style="text-align: center; color: var(--text-secondary); line-height: 1.6;">
+                    <p style="margin-bottom: 1rem;"><strong style="color: var(--error-color);">今日和本月下载次数均已达到上限</strong></p>
+                    <p style="margin-bottom: 0.5rem;">📅 今日配额：明日凌晨自动重置</p>
+                    <p style="margin-bottom: 0;">📅 本月配额：下月1号自动重置</p>
+                </div>
+            `;
         } else if (isDailyLimit) {
-            message = `今日下载次数已达上限（${this.downloadConfig.dailyLimit}次），请明天再试。`;
+            return `
+                <div style="text-align: center; color: var(--text-secondary); line-height: 1.6;">
+                    <p style="margin-bottom: 1rem;"><strong style="color: var(--warning-color);">今日下载次数已达上限</strong></p>
+                    <p style="margin-bottom: 0.5rem;">📅 每日配额：明日凌晨自动重置</p>
+                    <p style="margin-bottom: 0;">🔄 当前下载配额：${this.downloadConfig.dailyLimit}次/天</p>
+                </div>
+            `;
         } else {
-            message = `本月下载次数已达上限（${this.downloadConfig.monthlyLimit}次），请下月再试。`;
+            return `
+                <div style="text-align: center; color: var(--text-secondary); line-height: 1.6;">
+                    <p style="margin-bottom: 1rem;"><strong style="color: var(--warning-color);">本月下载次数已达上限</strong></p>
+                    <p style="margin-bottom: 0.5rem;">📅 月度配额：下月1号自动重置</p>
+                    <p style="margin-bottom: 0;">🔄 当前月度配额：${this.downloadConfig.monthlyLimit}次/月</p>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * 获取下载限制操作按钮
+     */
+    getDownloadLimitActions(isDailyLimit, isMonthlyLimit) {
+        let actions = `
+            <button class="download-limit-btn secondary" onclick="this.closest('.download-limit-modal').remove(); document.body.style.overflow='';">
+                <i class="fas fa-times"></i>
+                知道了
+            </button>
+        `;
+
+        if (isDailyLimit && !isMonthlyLimit) {
+            actions += `
+                <button class="download-limit-btn primary" onclick="window.app && window.app.showUsageModal && window.app.showUsageModal(); this.closest('.download-limit-modal').remove(); document.body.style.overflow='';">
+                    <i class="fas fa-chart-bar"></i>
+                    查看详情
+                </button>
+            `;
         }
 
-        // 使用全局应用的通知系统
-        if (window.app && window.app.showNotification) {
-            window.app.showNotification(message, 'error');
-        } else {
-            // 降级处理
-            console.error(`[UsageTracker] ${message}`);
-            this.showTemporaryNotification(message, 'error');
+        return actions;
+    }
+
+    /**
+     * 关闭下载限制模态框
+     */
+    closeDownloadLimitModal() {
+        const modal = document.querySelector('.download-limit-modal');
+        if (modal) {
+            modal.remove();
+            document.body.style.overflow = '';
         }
+    }
+
+    /**
+     * 显示下载警告通知
+     */
+    showDownloadWarningNotification(message) {
+        // 尝试使用全局应用的通知系统
+        if (window.app && window.app.showNotification) {
+            window.app.showNotification(message, 'warning');
+        } else {
+            // 使用自定义下载警告通知
+            this.showCustomDownloadWarning(message);
+        }
+    }
+
+    /**
+     * 显示自定义下载警告通知
+     */
+    showCustomDownloadWarning(message) {
+        // 移除已存在的下载警告通知
+        const existingWarning = document.querySelector('.download-warning-notification');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+
+        const notification = document.createElement('div');
+        notification.className = 'download-warning-notification';
+        notification.innerHTML = `
+            <div class="download-warning-content">
+                <div class="download-warning-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="download-warning-text">
+                    <div class="download-warning-title">下载限制提醒</div>
+                    <div class="download-warning-message">${message}</div>
+                </div>
+                <button class="download-warning-close" onclick="this.closest('.download-warning-notification').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        // 自动移除通知
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 8000);
+
+        // 点击关闭
+        notification.addEventListener('click', (e) => {
+            if (e.target === notification || e.target.closest('.download-warning-close')) {
+                notification.remove();
+            }
+        });
     }
 
     /**

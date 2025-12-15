@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载次数UI展示测试</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+        .test-button {
+            margin: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .test-button.danger {
+            background: #dc3545;
+            color: white;
+        }
+        .demo-status {
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+        .demo-status.normal {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .demo-status.warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .demo-status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1><i class="fas fa-download"></i> 下载次数UI展示测试</h1>
+        <p>这个页面用于测试下载次数控制功能的UI展示效果。</p>
+
+        <!-- 使用量显示区域 -->
+        <div class="test-section">
+            <h2>使用量显示区域</h2>
+            <div id="usage-display" class="usage-display">
+                <!-- 这里会动态显示使用量信息 -->
+            </div>
+        </div>
+
+        <!-- 下载状态指示器测试 -->
+        <div class="test-section">
+            <h2>下载状态指示器</h2>
+            <div class="demo-status">
+                <span class="download-status-indicator normal">
+                    <i class="fas fa-check-circle"></i> 正常状态
+                </span>
+            </div>
+            <div class="demo-status warning">
+                <span class="download-status-indicator warning">
+                    <i class="fas fa-exclamation-triangle"></i> 接近限制
+                </span>
+            </div>
+            <div class="demo-status error">
+                <span class="download-status-indicator error">
+                    <i class="fas fa-times-circle"></i> 已达限制
+                </span>
+            </div>
+        </div>
+
+        <!-- 功能测试按钮 -->
+        <div class="test-section">
+            <h2>功能测试</h2>
+            <p>点击下面的按钮测试不同的下载限制提示界面：</p>
+
+            <button class="test-button" onclick="testNormalDownload()">
+                <i class="fas fa-download"></i> 模拟正常下载
+            </button>
+
+            <button class="test-button warning" onclick="testNearDailyLimit()">
+                <i class="fas fa-exclamation-triangle"></i> 模拟接近日限制
+            </button>
+
+            <button class="test-button warning" onclick="testNearMonthlyLimit()">
+                <i class="fas fa-exclamation-triangle"></i> 模拟接近月限制
+            </button>
+
+            <button class="test-button danger" onclick="testDailyLimitReached()">
+                <i class="fas fa-times-circle"></i> 模拟达到日限制
+            </button>
+
+            <button class="test-button danger" onclick="testMonthlyLimitReached()">
+                <i class="fas fa-times-circle"></i> 模拟达到月限制
+            </button>
+
+            <button class="test-button danger" onclick="testBothLimitsReached()">
+                <i class="fas fa-times-circle"></i> 模拟日限制都达到
+            </button>
+
+            <button class="test-button" onclick="testDownloadWarning()">
+                <i class="fas fa-bell"></i> 测试下载警告通知
+            </button>
+
+            <button class="test-button" onclick="resetUsageDisplay()">
+                <i class="fas fa-redo"></i> 重置显示
+            </button>
+        </div>
+
+        <!-- 响应式设计测试 -->
+        <div class="test-section">
+            <h2>响应式设计测试</h2>
+            <p>请调整浏览器窗口大小来测试响应式设计效果：</p>
+            <ul>
+                <li>桌面端（>768px）：完整布局显示</li>
+                <li>平板端（≤768px）：按钮垂直排列，内容适配</li>
+                <li>手机端（≤480px）：优化字体大小和间距</li>
+            </ul>
+        </div>
+
+        <!-- 可访问性测试 -->
+        <div class="test-section">
+            <h2>可访问性功能</h2>
+            <p>测试以下可访问性功能：</p>
+            <ul>
+                <li><strong>键盘导航</strong>：使用Tab键在按钮间切换</li>
+                <li><strong>屏幕阅读器</strong>：按钮和链接有适当的aria标签</li>
+                <li><strong>对比度</strong>：在高对比度模式下检查颜色</li>
+                <li><strong>减少动画</strong>：在系统的减少动画偏好下测试</li>
+            </ul>
+        </div>
+
+        <!-- 深色模式测试 -->
+        <div class="test-section">
+            <h2>深色模式测试</h2>
+            <p>如果系统支持深色模式，切换系统主题来测试深色模式的显示效果。</p>
+        </div>
+    </div>
+
+    <!-- 引入必要的JavaScript -->
+    <script src="js/config.js"></script>
+    <script>
+        // 模拟UsageTracker类（简化版本用于测试）
+        class MockUsageTracker {
+            constructor() {
+                this.config = {
+                    dailyLimit: 10,
+                    monthlyLimit: 300,
+                    warningThreshold: 0.8
+                };
+                this.downloadConfig = {
+                    dailyLimit: 5,
+                    monthlyLimit: 150,
+                    warningThreshold: 0.8
+                };
+                this.usageData = {
+                    generation: {
+                        daily: { count: 3, limit: this.config.dailyLimit },
+                        monthly: { count: 45, limit: this.config.monthlyLimit }
+                    },
+                    download: {
+                        daily: { count: 2, limit: this.downloadConfig.dailyLimit },
+                        monthly: { count: 25, limit: this.downloadConfig.monthlyLimit }
+                    }
+                };
+            }
+
+            getUsage() {
+                const daily = this.usageData.generation.daily;
+                const monthly = this.usageData.generation.monthly;
+
+                return {
+                    daily: {
+                        count: daily.count,
+                        limit: daily.limit,
+                        percentage: (daily.count / daily.limit) * 100
+                    },
+                    monthly: {
+                        count: monthly.count,
+                        limit: monthly.limit,
+                        percentage: (monthly.count / monthly.limit) * 100
+                    }
+                };
+            }
+
+            getDownloadUsage() {
+                const daily = this.usageData.download.daily;
+                const monthly = this.usageData.download.monthly;
+
+                return {
+                    daily: {
+                        count: daily.count,
+                        limit: daily.limit,
+                        percentage: (daily.count / daily.limit) * 100
+                    },
+                    monthly: {
+                        count: monthly.count,
+                        limit: monthly.limit,
+                        percentage: (monthly.count / monthly.limit) * 100
+                    }
+                };
+            }
+
+            updateUsageDisplay() {
+                const usage = this.getUsage();
+                const downloadUsage = this.getDownloadUsage();
+
+                // 计算进度条样式类
+                let generationProgressClass = 'normal';
+                if (usage.daily.percentage >= 100) {
+                    generationProgressClass = 'error';
+                } else if (usage.daily.percentage >= this.config.warningThreshold * 100) {
+                    generationProgressClass = 'warning';
+                }
+
+                let downloadProgressClass = 'normal';
+                if (downloadUsage.daily.percentage >= 100) {
+                    downloadProgressClass = 'error';
+                } else if (downloadUsage.daily.percentage >= this.downloadConfig.warningThreshold * 100) {
+                    downloadProgressClass = 'warning';
+                }
+
+                const usageElement = document.getElementById('usage-display');
+                if (usageElement) {
+                    usageElement.innerHTML = `
+                        <div class="usage-info">
+                            <div class="usage-section">
+                                <span class="usage-daily">生成: ${usage.daily.count}/${usage.daily.limit}</span>
+                                <span class="usage-monthly">本月: ${usage.monthly.count}/${usage.monthly.limit}</span>
+                            </div>
+                            <div class="usage-section">
+                                <span class="download-daily">下载: ${downloadUsage.daily.count}/${downloadUsage.daily.limit}</span>
+                                <span class="download-monthly">本月: ${downloadUsage.monthly.count}/${downloadUsage.monthly.limit}</span>
+                            </div>
+                        </div>
+                        <div class="usage-progress-container">
+                            <div class="usage-progress-bar generation ${generationProgressClass}" style="width: ${usage.daily.percentage}%" title="生成进度: ${usage.daily.count}/${usage.daily.limit}"></div>
+                            <div class="usage-progress-bar download ${downloadProgressClass}" style="width: ${downloadUsage.daily.percentage}%" title="下载进度: ${downloadUsage.daily.count}/${downloadUsage.daily.limit}"></div>
+                        </div>
+                    `;
+
+                    // 添加警告样式
+                    if (downloadUsage.daily.percentage >= 100) {
+                        usageElement.classList.add('download-limit-reached');
+                    } else if (downloadUsage.daily.percentage >= this.downloadConfig.warningThreshold * 100) {
+                        usageElement.classList.add('download-near-limit');
+                    } else {
+                        usageElement.classList.remove('download-near-limit', 'download-limit-reached');
+                    }
+                }
+            }
+
+            // 其他方法的模拟实现...
+            showDownloadLimitModal(downloadUsage, isDailyLimit, isMonthlyLimit) {
+                // 实现与真实UsageTracker相同的模态框显示逻辑
+                console.log('显示下载限制模态框:', { downloadUsage, isDailyLimit, isMonthlyLimit });
+            }
+        }
+
+        // 创建模拟的UsageTracker实例
+        const mockTracker = new MockUsageTracker();
+
+        // 页面加载时初始化显示
+        document.addEventListener('DOMContentLoaded', function() {
+            mockTracker.updateUsageDisplay();
+        });
+
+        // 测试函数
+        function testNormalDownload() {
+            mockTracker.usageData.download.daily.count = 2;
+            mockTracker.usageData.download.monthly.count = 25;
+            mockTracker.updateUsageDisplay();
+            showNotification('模拟正常下载状态', 'success');
+        }
+
+        function testNearDailyLimit() {
+            mockTracker.usageData.download.daily.count = 4; // 接近5的限制
+            mockTracker.updateUsageDisplay();
+            showNotification('模拟接近日限制状态', 'warning');
+        }
+
+        function testNearMonthlyLimit() {
+            mockTracker.usageData.download.daily.count = 2;
+            mockTracker.usageData.download.monthly.count = 120; // 接近150的限制
+            mockTracker.updateUsageDisplay();
+            showNotification('模拟接近月限制状态', 'warning');
+        }
+
+        function testDailyLimitReached() {
+            // 模拟日限制达到时的模态框
+            showModal(
+                'download-limit-modal',
+                '下载限制',
+                `<div class="download-limit-info">
+                    <div class="download-limit-row">
+                        <span class="label">今日下载：</span>
+                        <span class="value exceeded">5/5</span>
+                    </div>
+                    <div class="download-limit-progress">
+                        <div class="download-limit-progress-bar">
+                            <div class="download-limit-progress-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="download-limit-message">
+                    <p><strong style="color: var(--warning-color);">今日下载次数已达上限</strong></p>
+                    <p>📅 每日配额：明日凌晨自动重置</p>
+                    <p>🔄 当前下载配额：5次/天</p>
+                </div>`,
+                `<button class="download-limit-btn secondary" onclick="closeModal('download-limit-modal')">
+                    <i class="fas fa-times"></i> 知道了
+                </button>
+                <button class="download-limit-btn primary" onclick="closeModal('download-limit-modal')">
+                    <i class="fas fa-chart-bar"></i> 查看详情
+                </button>`
+            );
+        }
+
+        function testMonthlyLimitReached() {
+            showModal(
+                'download-limit-modal',
+                '下载限制',
+                `<div class="download-limit-info">
+                    <div class="download-limit-row">
+                        <span class="label">今日下载：</span>
+                        <span class="value">3/5</span>
+                    </div>
+                    <div class="download-limit-progress">
+                        <div class="download-limit-progress-bar">
+                            <div class="download-limit-progress-fill" style="width: 60%"></div>
+                        </div>
+                    </div>
+                    <div class="download-limit-row">
+                        <span class="label">本月下载：</span>
+                        <span class="value exceeded">150/150</span>
+                    </div>
+                    <div class="download-limit-progress">
+                        <div class="download-limit-progress-bar">
+                            <div class="download-limit-progress-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="download-limit-message">
+                    <p><strong style="color: var(--warning-color);">本月下载次数已达上限</strong></p>
+                    <p>📅 月度配额：下月1号自动重置</p>
+                    <p>🔄 当前月度配额：150次/月</p>
+                </div>`,
+                `<button class="download-limit-btn secondary" onclick="closeModal('download-limit-modal')">
+                    <i class="fas fa-times"></i> 知道了
+                </button>`
+            );
+        }
+
+        function testBothLimitsReached() {
+            showModal(
+                'download-limit-modal',
+                '下载限制',
+                `<div class="download-limit-info">
+                    <div class="download-limit-row">
+                        <span class="label">今日下载：</span>
+                        <span class="value exceeded">5/5</span>
+                    </div>
+                    <div class="download-limit-progress">
+                        <div class="download-limit-progress-bar">
+                            <div class="download-limit-progress-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div class="download-limit-row">
+                        <span class="label">本月下载：</span>
+                        <span class="value exceeded">150/150</span>
+                    </div>
+                    <div class="download-limit-progress">
+                        <div class="download-limit-progress-bar">
+                            <div class="download-limit-progress-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="download-limit-message">
+                    <p><strong style="color: var(--error-color);">今日和本月下载次数均已达到上限</strong></p>
+                    <p>📅 今日配额：明日凌晨自动重置</p>
+                    <p>📅 本月配额：下月1号自动重置</p>
+                </div>`,
+                `<button class="download-limit-btn secondary" onclick="closeModal('download-limit-modal')">
+                    <i class="fas fa-times"></i> 知道了
+                </button>`
+            );
+        }
+
+        function testDownloadWarning() {
+            showDownloadWarningNotification('您的下载次数即将达到限制，请注意合理使用。');
+        }
+
+        function resetUsageDisplay() {
+            mockTracker.usageData.download.daily.count = 2;
+            mockTracker.usageData.download.monthly.count = 25;
+            mockTracker.updateUsageDisplay();
+            showNotification('使用量显示已重置', 'info');
+        }
+
+        // 辅助函数
+        function showModal(modalClass, title, bodyContent, actionsContent) {
+            // 移除已存在的模态框
+            const existingModal = document.querySelector(`.${modalClass}`);
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.className = `modal ${modalClass} fade show`;
+            modal.style.display = 'block';
+            modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            modal.setAttribute('tabindex', '-1');
+            modal.setAttribute('role', 'dialog');
+
+            const modalHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-download download-limit-icon"></i>
+                                ${title}
+                            </h5>
+                        </div>
+                        <div class="modal-body">
+                            ${bodyContent}
+                        </div>
+                        <div class="modal-footer">
+                            <div class="download-limit-actions">
+                                ${actionsContent}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modal.innerHTML = modalHTML;
+            document.body.appendChild(modal);
+            document.body.style.overflow = 'hidden';
+
+            // 点击背景关闭
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal(modalClass);
+                }
+            });
+        }
+
+        function closeModal(modalClass) {
+            const modal = document.querySelector(`.${modalClass}`);
+            if (modal) {
+                modal.remove();
+                document.body.style.overflow = '';
+            }
+        }
+
+        function showDownloadWarningNotification(message) {
+            // 移除已存在的下载警告通知
+            const existingWarning = document.querySelector('.download-warning-notification');
+            if (existingWarning) {
+                existingWarning.remove();
+            }
+
+            const notification = document.createElement('div');
+            notification.className = 'download-warning-notification';
+            notification.innerHTML = `
+                <div class="download-warning-content">
+                    <div class="download-warning-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="download-warning-text">
+                        <div class="download-warning-title">下载限制提醒</div>
+                        <div class="download-warning-message">${message}</div>
+                    </div>
+                    <button class="download-warning-close" onclick="this.closest('.download-warning-notification').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // 自动移除通知
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 8000);
+        }
+
+        function showNotification(message, type = 'info') {
+            // 简单的通知显示
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem;
+                background: ${type === 'success' ? '#d4edda' : type === 'warning' ? '#fff3cd' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
+                color: ${type === 'success' ? '#155724' : type === 'warning' ? '#856404' : type === 'error' ? '#721c24' : '#0c5460'};
+                border-radius: 4px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                z-index: 9999;
+                max-width: 300px;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
