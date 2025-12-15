@@ -1575,3 +1575,504 @@ textarea:focus {
         display: none;
     }
 }
+
+/* ========================================
+   使用量UI展示样式 - 任务12
+   ======================================== */
+
+/* 使用量展示增强样式 */
+.usage-display {
+    min-width: 180px;
+    position: relative;
+    overflow: hidden;
+}
+
+.usage-daily,
+.usage-monthly {
+    display: block;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* 正常状态 - 添加微妙的发光效果 */
+.usage-display:not(.usage-near-limit):not(.usage-limit-reached) {
+    box-shadow: 0 0 20px rgba(150, 206, 180, 0.3);
+}
+
+/* 警告状态（80% - 99%） */
+.usage-display.usage-near-limit {
+    background: rgba(255, 234, 167, 0.25);
+    border-color: var(--warning-color);
+    animation: warningPulse 2s ease-in-out infinite;
+}
+
+.usage-display.usage-near-limit::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 234, 167, 0.4), transparent);
+    animation: warningSweep 3s ease-in-out infinite;
+}
+
+/* 限制状态（100%） */
+.usage-display.usage-limit-reached {
+    background: rgba(255, 118, 117, 0.25);
+    border-color: var(--error-color);
+    animation: errorPulse 1.5s ease-in-out infinite;
+}
+
+.usage-display.usage-limit-reached::after {
+    content: '⚠️';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    animation: iconBounce 1s ease-in-out infinite;
+}
+
+/* ========================================
+   进度条系统
+   ======================================== */
+
+/* 进度条容器 */
+.usage-progress-container {
+    margin-top: 8px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 进度条 */
+.usage-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 进度条条纹动画 */
+.usage-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        45deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 70%
+    );
+    animation: progressStripe 1s linear infinite;
+}
+
+/* 进度条状态颜色 */
+.usage-progress-bar.normal {
+    background: linear-gradient(90deg, var(--success-color), #81C784);
+}
+
+.usage-progress-bar.warning {
+    background: linear-gradient(90deg, var(--warning-color), #FFD54F);
+}
+
+.usage-progress-bar.error {
+    background: linear-gradient(90deg, var(--error-color), #E57373);
+    animation: progressError 0.5s ease-in-out infinite alternate;
+}
+
+/* ========================================
+   通知系统样式
+   ======================================== */
+
+/* 内联通知容器 */
+.usage-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1001;
+    max-width: 350px;
+    animation: slideInRight 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* 通知内容 */
+.usage-notification-content {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    padding: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    position: relative;
+}
+
+/* 通知类型样式 */
+.usage-notification.warning .usage-notification-content {
+    border-left: 4px solid var(--warning-color);
+    background: linear-gradient(135deg, #FFFAF0 0%, #FFF8E1 100%);
+}
+
+.usage-notification.error .usage-notification-content {
+    border-left: 4px solid var(--error-color);
+    background: linear-gradient(135deg, #FFF5F5 0%, #FFEBEE 100%);
+}
+
+/* 通知图标 */
+.usage-notification-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.usage-notification.warning .usage-notification-icon {
+    color: #F9A825;
+}
+
+.usage-notification.error .usage-notification-icon {
+    color: #E53935;
+}
+
+/* 通知文本 */
+.usage-notification-text {
+    flex: 1;
+}
+
+.usage-notification-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--text-primary);
+}
+
+.usage-notification-message {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* 通知关闭按钮 */
+.usage-notification-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.usage-notification-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   限制提示模态框增强
+   ======================================== */
+
+/* 使用量限制模态框特殊样式 */
+.usage-limit-modal .modal-content {
+    max-width: 450px;
+    position: relative;
+    overflow: hidden;
+}
+
+.usage-limit-modal .modal-icon {
+    font-size: 4rem;
+    color: var(--error-color);
+    animation: limitIconBounce 2s ease-in-out infinite;
+}
+
+/* 限制信息卡片 */
+.limit-info-card {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+}
+
+.limit-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.limit-info-row:last-child {
+    margin-bottom: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    font-weight: 600;
+    color: var(--error-color);
+}
+
+/* 操作按钮组 */
+.limit-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 25px;
+}
+
+.limit-action-btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+}
+
+.limit-action-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.limit-action-btn.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.limit-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ========================================
+   动画关键帧
+   ======================================== */
+
+/* 警告脉冲 */
+@keyframes warningPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+
+/* 错误脉冲 */
+@keyframes errorPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(244, 67, 54, 0);
+    }
+}
+
+/* 扫光效果 */
+@keyframes warningSweep {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* 图标弹跳 */
+@keyframes iconBounce {
+    0%, 100% {
+        transform: translateY(-50%) scale(1);
+    }
+    50% {
+        transform: translateY(-50%) scale(1.2);
+    }
+}
+
+/* 进度条条纹 */
+@keyframes progressStripe {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* 进度条错误闪烁 */
+@keyframes progressError {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.7;
+    }
+}
+
+/* 通知滑入 */
+@keyframes slideInRight {
+    0% {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 限制图标弹跳 */
+@keyframes limitIconBounce {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* ========================================
+   响应式设计
+   ======================================== */
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .usage-display {
+        min-width: auto;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .usage-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+
+    .usage-limit-modal .modal-content {
+        margin: 10px;
+        max-width: none;
+    }
+
+    .limit-actions {
+        flex-direction: column;
+    }
+
+    .limit-action-btn {
+        width: 100%;
+    }
+
+    .usage-notification-content {
+        padding: 15px;
+    }
+
+    .usage-progress-container {
+        height: 4px;
+    }
+}
+
+/* 超小屏幕 */
+@media (max-width: 480px) {
+    .usage-daily,
+    .usage-monthly {
+        font-size: 0.8rem;
+    }
+
+    .usage-progress-container {
+        height: 4px;
+    }
+
+    .usage-notification-content {
+        padding: 12px;
+    }
+
+    .usage-notification-icon {
+        font-size: 1.2rem;
+    }
+
+    .usage-notification-title {
+        font-size: 0.9rem;
+    }
+
+    .usage-notification-message {
+        font-size: 0.8rem;
+    }
+
+    .limit-info-card {
+        padding: 15px;
+    }
+
+    .limit-info-row {
+        font-size: 0.85rem;
+    }
+}
+
+/* ========================================
+   可访问性支持
+   ======================================== */
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .usage-display,
+    .usage-progress-bar,
+    .usage-notification,
+    .usage-limit-modal .modal-icon {
+        animation: none !important;
+    }
+
+    .usage-progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    .usage-notification {
+        animation: fadeIn 0.3s ease;
+    }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+    .usage-display {
+        border-width: 2px;
+    }
+
+    .usage-notification-content {
+        border-width: 2px;
+    }
+
+    .usage-progress-container {
+        border: 1px solid var(--border-color);
+    }
+
+    .limit-info-card {
+        border: 1px solid var(--border-color);
+    }
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+    .usage-notification-content {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+
+    .usage-notification.warning .usage-notification-content {
+        background: linear-gradient(135deg, #3E2723 0%, #4E342E 100%);
+    }
+
+    .usage-notification.error .usage-notification-content {
+        background: linear-gradient(135deg, #3E2723 0%, #4A2C2A 100%);
+    }
+
+    .limit-info-card {
+        background: var(--bg-tertiary);
+    }
+}

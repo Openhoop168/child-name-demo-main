@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用量UI测试 - 任务12</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .demo-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:hover { transform: translateY(-1px); opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <h1>使用量UI样式测试 - 任务12</h1>
+
+    <!-- 测试1：正常状态 -->
+    <div class="test-section">
+        <h2 class="test-title">测试1：正常状态（< 80%）</h2>
+        <div class="demo-container">
+            <div class="header">
+                <div class="header-left">
+                    <h1><i class="fas fa-book"></i> 儿童识字小报</h1>
+                    <p class="subtitle">使用量正常状态</p>
+                </div>
+                <div id="usage-normal" class="usage-display">
+                    <div class="usage-info">
+                        <span class="usage-daily">今日: 40/100</span>
+                        <span class="usage-monthly">本月: 1200/3000</span>
+                    </div>
+                    <div class="usage-progress-container">
+                        <div class="usage-progress-bar normal" style="width: 40%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 测试2：警告状态 -->
+    <div class="test-section">
+        <h2 class="test-title">测试2：警告状态（80% - 99%）</h2>
+        <div class="demo-container">
+            <div class="header">
+                <div class="header-left">
+                    <h1><i class="fas fa-book"></i> 儿童识字小报</h1>
+                    <p class="subtitle">使用量警告状态</p>
+                </div>
+                <div id="usage-warning" class="usage-display usage-near-limit">
+                    <div class="usage-info">
+                        <span class="usage-daily">今日: 85/100</span>
+                        <span class="usage-monthly">本月: 1200/3000</span>
+                    </div>
+                    <div class="usage-progress-container">
+                        <div class="usage-progress-bar warning" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 测试3：限制状态 -->
+    <div class="test-section">
+        <h2 class="test-title">测试3：限制状态（100%）</h2>
+        <div class="demo-container">
+            <div class="header">
+                <div class="header-left">
+                    <h1><i class="fas fa-book"></i> 儿童识字小报</h1>
+                    <p class="subtitle">使用量达到限制</p>
+                </div>
+                <div id="usage-limit" class="usage-display usage-limit-reached">
+                    <div class="usage-info">
+                        <span class="usage-daily">今日: 100/100</span>
+                        <span class="usage-monthly">本月: 1200/3000</span>
+                    </div>
+                    <div class="usage-progress-container">
+                        <div class="usage-progress-bar error" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 测试4：通知系统 -->
+    <div class="test-section">
+        <h2 class="test-title">测试4：通知系统</h2>
+        <div class="controls">
+            <button class="btn btn-primary" onclick="showNotification('warning')">显示警告通知</button>
+            <button class="btn btn-danger" onclick="showNotification('error')">显示错误通知</button>
+            <button class="btn btn-primary" onclick="clearNotifications()">清除通知</button>
+        </div>
+    </div>
+
+    <!-- 测试5：模态框 -->
+    <div class="test-section">
+        <h2 class="test-title">测试5：限制提示模态框</h2>
+        <div class="controls">
+            <button class="btn btn-danger" onclick="showLimitModal()">显示限制模态框</button>
+        </div>
+    </div>
+
+    <!-- 限制模态框模板 -->
+    <div id="limitModal" class="modal usage-limit-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="modal-text">
+                <h2>今日使用次数已达上限</h2>
+                <p>您今天的免费使用次数已经用完，请明天再试或升级到付费套餐。</p>
+
+                <div class="limit-info-card">
+                    <div class="limit-info-row">
+                        <span>今日已使用：</span>
+                        <span>100/100 次</span>
+                    </div>
+                    <div class="limit-info-row">
+                        <span>本月已使用：</span>
+                        <span>1200/3000 次</span>
+                    </div>
+                    <div class="limit-info-row">
+                        <span>下次重置时间：</span>
+                        <span>明天 00:00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-close">
+                <i class="fas fa-times"></i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 显示通知
+        function showNotification(type) {
+            // 清除现有通知
+            clearNotifications();
+
+            const notification = document.createElement('div');
+            notification.className = `usage-notification ${type}`;
+            notification.innerHTML = `
+                <div class="usage-notification-content">
+                    <div class="usage-notification-icon">
+                        <i class="fas ${type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle'}"></i>
+                    </div>
+                    <div class="usage-notification-text">
+                        <div class="usage-notification-title">
+                            ${type === 'warning' ? '使用量警告' : '使用量限制'}
+                        </div>
+                        <div class="usage-notification-message">
+                            ${type === 'warning' ?
+                                '今日剩余生成次数仅剩 15 次，请合理使用。' :
+                                '今日使用次数已达上限，请明天再试。'}
+                        </div>
+                    </div>
+                    <button class="usage-notification-close" onclick="this.closest('.usage-notification').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // 自动隐藏
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideInRight 0.4s ease-in-out reverse';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 400);
+                }
+            }, 5000);
+        }
+
+        // 清除所有通知
+        function clearNotifications() {
+            const notifications = document.querySelectorAll('.usage-notification');
+            notifications.forEach(n => n.remove());
+        }
+
+        // 显示限制模态框
+        function showLimitModal() {
+            const modal = document.getElementById('limitModal');
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+
+        // 关闭模态框
+        document.querySelectorAll('.modal-close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', function() {
+                const modal = this.closest('.modal');
+                modal.classList.remove('active');
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
+            });
+        });
+
+        // 点击模态框背景关闭
+        document.getElementById('limitModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+                setTimeout(() => {
+                    this.style.display = 'none';
+                }, 300);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -283,10 +283,21 @@ class UsageTracker {
         // 查找使用量显示元素
         const usageElement = document.getElementById('usage-display');
         if (usageElement) {
+            // 计算进度条样式类
+            let progressClass = 'normal';
+            if (usage.daily.percentage >= 100) {
+                progressClass = 'error';
+            } else if (usage.daily.percentage >= this.config.warningThreshold * 100) {
+                progressClass = 'warning';
+            }
+
             usageElement.innerHTML = `
                 <div class="usage-info">
                     <span class="usage-daily">今日: ${usage.daily.count}/${usage.daily.limit}</span>
                     <span class="usage-monthly">本月: ${usage.monthly.count}/${usage.monthly.limit}</span>
+                </div>
+                <div class="usage-progress-container">
+                    <div class="usage-progress-bar ${progressClass}" style="width: ${usage.daily.percentage}%"></div>
                 </div>
             `;
 
