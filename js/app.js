@@ -1132,6 +1132,34 @@ class ChildrenLiteracyApp {
                         'warning'
                     );
                 }
+
+                // 检查下载配额
+                if (window.usageTracker.downloadConfig.enableDownloadTracking) {
+                    const downloadUsage = window.usageTracker.getDownloadUsage();
+
+                    // 检查是否已达到下载限制
+                    if (!window.usageTracker.checkDownloadLimit()) {
+                        const limitType = downloadUsage.daily.count >= downloadUsage.daily.limit ? '每日' : '本月';
+                        this.showMessage(
+                            `${limitType}下载次数已达上限（${downloadUsage.daily.count}/${downloadUsage.daily.limit}次），无法生成新图片`,
+                            'error'
+                        );
+                        this.isGenerating = false;
+                        this.updateGenerateButtonState(false);
+                        this.goToStep(2);
+                        return;
+                    }
+
+                    // 检查是否接近下载限制
+                    if (window.usageTracker.isNearDownloadLimit()) {
+                        const remaining = downloadUsage.daily.remaining;
+                        const percentage = Math.round((downloadUsage.daily.count / downloadUsage.daily.limit) * 100);
+                        this.showMessage(
+                            `今日下载已使用 ${downloadUsage.daily.count}/${downloadUsage.daily.limit} 次（${percentage}%），剩余仅 ${remaining} 次`,
+                            'warning'
+                        );
+                    }
+                }
             }
 
             // 清空日志
@@ -1274,7 +1302,15 @@ class ChildrenLiteracyApp {
             this.elements.generatedImage.onload = () => {
                 setTimeout(() => {
                     this.goToStep(4);
-                    this.showMessage('图片生成成功！', 'success');
+
+                    // 获取下载配额信息
+                    let downloadInfo = '';
+                    if (window.usageTracker && window.usageTracker.downloadConfig.enableDownloadTracking) {
+                        const downloadUsage = window.usageTracker.getDownloadUsage();
+                        downloadInfo = `，剩余下载次数：${downloadUsage.daily.remaining}`;
+                    }
+
+                    this.showMessage(`图片生成成功！${downloadInfo}`, 'success');
                 }, 1000);
             };
 

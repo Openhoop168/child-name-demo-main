@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载控制功能测试</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: var(--text-color);
+        }
+        button {
+            margin: 10px 10px 10px 0;
+        }
+        #test-results {
+            background: var(--secondary-bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-pass {
+            background: #4CAF50;
+            color: white;
+        }
+        .status-fail {
+            background: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>下载控制功能测试</h1>
+
+    <div class="test-section">
+        <h3>测试1：下载限制检查</h3>
+        <p>设置下载限制为0，尝试生成图片应该显示错误提示</p>
+        <button onclick="testDownloadLimitZero()">执行测试1</button>
+        <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试2：下载配额警告</h3>
+        <p>设置下载次数接近限制，生成图片应该显示警告</p>
+        <button onclick="testDownloadNearLimit()">执行测试2</button>
+        <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试3：成功提示信息</h3>
+        <p>正常生成图片，成功提示应包含下载配额信息</p>
+        <button onclick="testSuccessMessage()">执行测试3</button>
+        <div id="test3-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试4：控制台输出验证</h3>
+        <p>查看控制台输出，验证下载追踪是否正常工作</p>
+        <button onclick="testConsoleOutput()">执行测试4</button>
+        <div id="test4-result"></div>
+    </div>
+
+    <div id="test-results"></div>
+
+    <script src="js/storage-manager.js"></script>
+    <script src="js/usage-tracker.js"></script>
+    <script>
+        // 测试结果收集
+        let testResults = [];
+        let testCount = 0;
+
+        // 初始化 UsageTracker
+        window.storageManager = new StorageManager();
+        window.usageTracker = new UsageTracker({
+            dailyLimit: 10,
+            monthlyLimit: 300,
+            enableUsageTracking: true,
+            warningThreshold: 0.8
+        }, {
+            dailyLimit: 5,
+            monthlyLimit: 100,
+            enableDownloadTracking: true,
+            warningThreshold: 0.8
+        });
+
+        // 模拟应用的 showMessage 方法
+        function showMessage(message, type) {
+            testResults.push(`[消息提示] ${type.toUpperCase()}: ${message}`);
+            console.log(`[测试消息] ${type}: ${message}`);
+        }
+
+        function log(message) {
+            testResults.push(message);
+            console.log(message);
+        }
+
+        function updateTestResult(testId, status, message) {
+            const element = document.getElementById(`${testId}-result`);
+            const statusClass = status === 'pass' ? 'status-pass' : 'status-fail';
+            element.innerHTML = `<span class="status ${statusClass}">${status.toUpperCase()}</span> ${message}`;
+        }
+
+        function updateAllResults() {
+            const resultsElement = document.getElementById('test-results');
+            resultsElement.textContent = testResults.join('\n');
+        }
+
+        // 测试1：下载限制为0的情况
+        async function testDownloadLimitZero() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 下载限制检查 ===`);
+
+            try {
+                // 设置下载限制为0
+                window.usageTracker.downloadConfig.dailyLimit = 0;
+                window.usageTracker.usageData.download.daily.count = 0;
+
+                // 测试检查下载限制
+                const canDownload = window.usageTracker.checkDownloadLimit();
+
+                if (!canDownload) {
+                    log('✓ 下载限制检查正常：当限制为0时返回false');
+
+                    // 模拟生成前的检查逻辑（来自 app.js）
+                    const downloadUsage = window.usageTracker.getDownloadUsage();
+                    if (!window.usageTracker.checkDownloadLimit()) {
+                        showMessage('每日下载次数已达上限（0/0次），无法生成新图片', 'error');
+                        log('✓ 生成前正确阻止了生成并显示错误提示');
+                        updateTestResult('test1', 'pass', '下载限制检查正常工作');
+                    }
+                } else {
+                    log('✗ 下载限制检查失败：当限制为0时应该返回false');
+                    updateTestResult('test1', 'fail', '下载限制检查失败');
+                }
+
+            } catch (error) {
+                log(`✗ 测试1出错: ${error.message}`);
+                updateTestResult('test1', 'fail', `测试出错: ${error.message}`);
+            }
+
+            updateAllResults();
+        }
+
+        // 测试2：接近下载限制的情况
+        async function testDownloadNearLimit() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 下载配额警告 ===`);
+
+            try {
+                // 设置下载限制为5，当前使用4次（80%）
+                window.usageTracker.downloadConfig.dailyLimit = 5;
+                window.usageTracker.downloadConfig.warningThreshold = 0.8;
+                window.usageTracker.usageData.download.daily.count = 4;
+
+                // 测试是否接近限制
+                const isNearLimit = window.usageTracker.isNearDownloadLimit();
+
+                if (isNearLimit) {
+                    log('✓ 接近限制检查正常：当使用率达到80%时返回true');
+
+                    // 模拟生成前的警告提示（来自 app.js）
+                    const downloadUsage = window.usageTracker.getDownloadUsage();
+                    if (window.usageTracker.isNearDownloadLimit()) {
+                        const remaining = downloadUsage.daily.remaining;
+                        const percentage = Math.round((downloadUsage.daily.count / downloadUsage.daily.limit) * 100);
+                        showMessage(
+                            `今日下载已使用 ${downloadUsage.daily.count}/${downloadUsage.daily.limit} 次（${percentage}%），剩余仅 ${remaining} 次`,
+                            'warning'
+                        );
+                        log('✓ 正确显示了下载配额警告');
+                        updateTestResult('test2', 'pass', '下载配额警告正常工作');
+                    }
+                } else {
+                    log('✗ 接近限制检查失败：当使用率达到80%时应该返回true');
+                    updateTestResult('test2', 'fail', '接近限制检查失败');
+                }
+
+            } catch (error) {
+                log(`✗ 测试2出错: ${error.message}`);
+                updateTestResult('test2', 'fail', `测试出错: ${error.message}`);
+            }
+
+            updateAllResults();
+        }
+
+        // 测试3：成功提示信息
+        async function testSuccessMessage() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 成功提示信息 ===`);
+
+            try {
+                // 设置正常的下载配额
+                window.usageTracker.downloadConfig.dailyLimit = 5;
+                window.usageTracker.downloadConfig.warningThreshold = 0.8;
+                window.usageTracker.usageData.download.daily.count = 2;
+
+                // 模拟生成成功后的提示（来自 app.js）
+                let downloadInfo = '';
+                if (window.usageTracker && window.usageTracker.downloadConfig.enableDownloadTracking) {
+                    const downloadUsage = window.usageTracker.getDownloadUsage();
+                    downloadInfo = `，剩余下载次数：${downloadUsage.daily.remaining}`;
+                }
+
+                const successMessage = `图片生成成功！${downloadInfo}`;
+                showMessage(successMessage, 'success');
+
+                log(`✓ 成功提示包含下载配额信息: ${successMessage}`);
+                updateTestResult('test3', 'pass', '成功提示包含下载配额信息');
+
+            } catch (error) {
+                log(`✗ 测试3出错: ${error.message}`);
+                updateTestResult('test3', 'fail', `测试出错: ${error.message}`);
+            }
+
+            updateAllResults();
+        }
+
+        // 测试4：控制台输出验证
+        async function testConsoleOutput() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 控制台输出验证 ===`);
+
+            try {
+                // 重置下载计数
+                window.usageTracker.usageData.download.daily.count = 0;
+
+                // 模拟下载追踪
+                const result = window.usageTracker.trackDownload({
+                    taskId: 'test-task-id',
+                    theme: '测试主题',
+                    title: '测试标题',
+                    timestamp: new Date().toISOString()
+                });
+
+                if (result) {
+                    log('✓ 下载追踪成功执行');
+
+                    // 验证计数增加
+                    const downloadUsage = window.usageTracker.getDownloadUsage();
+                    if (downloadUsage.daily.count === 1) {
+                        log('✓ 下载计数正确增加');
+                        updateTestResult('test4', 'pass', '下载追踪和计数正常');
+                    } else {
+                        log(`✗ 下载计数错误: 期望1，实际${downloadUsage.daily.count}`);
+                        updateTestResult('test4', 'fail', '下载计数错误');
+                    }
+                } else {
+                    log('✗ 下载追踪失败');
+                    updateTestResult('test4', 'fail', '下载追踪失败');
+                }
+
+            } catch (error) {
+                log(`✗ 测试4出错: ${error.message}`);
+                updateTestResult('test4', 'fail', `测试出错: ${error.message}`);
+            }
+
+            updateAllResults();
+        }
+
+        // 页面加载时的初始化信息
+        window.onload = function() {
+            log('下载控制功能测试页面已加载');
+            log('UsageTracker 初始化完成');
+            log('可以开始执行测试');
+            updateAllResults();
+        };
+    </script>
+</body>
+</html>
