@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用量追踪功能测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-section {
+            background: white;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .usage-display {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>儿童识字小报生成器 - 使用量追踪功能测试</h1>
+
+    <div class="container">
+        <h2>测试说明</h2>
+        <p>本页面用于测试使用量追踪功能的各项特性，包括：</p>
+        <ul>
+            <li>使用量初始化</li>
+            <li>生成成功后计数增加</li>
+            <li>日限制检查</li>
+            <li>接近限制警告</li>
+            <li>数据持久化</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>1. 基础功能测试</h3>
+        <button onclick="testInitialization()">测试初始化</button>
+        <button onclick="testUsageData()">查看当前使用量</button>
+        <button onclick="resetUsageData()">重置使用量数据</button>
+        <div id="basic-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. 生成模拟测试</h3>
+        <button onclick="simulateGeneration()">模拟成功生成</button>
+        <button onclick="simulateMultipleGenerations(5)">模拟5次生成</button>
+        <button onclick="simulateUntilNearLimit()">生成到接近限制</button>
+        <button onclick="simulateUntilLimit()">生成到达到限制</button>
+        <div id="generation-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. 限制检查测试</h3>
+        <button onclick="testDailyLimit()">测试日限制</button>
+        <button onclick="testNearLimit()">测试接近限制警告</button>
+        <div id="limit-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. 数据持久化测试</h3>
+        <button onclick="testDataPersistence()">测试数据保存</button>
+        <button onclick="testStorageSync()">测试与StorageManager同步</button>
+        <div id="persistence-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>5. 使用量显示</h3>
+        <div id="usage-display" class="usage-display">等待加载使用量数据...</div>
+        <button onclick="updateUsageDisplay()">更新显示</button>
+    </div>
+
+    <div class="test-section">
+        <h3>6. 测试日志</h3>
+        <div id="test-log" class="log">测试日志将显示在这里...</div>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <!-- 引入必要的脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/storage-manager.js"></script>
+    <script src="js/usage-tracker.js"></script>
+
+    <script>
+        // 测试状态
+        let testResults = {
+            initialization: false,
+            generation: false,
+            limits: false,
+            persistence: false
+        };
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('test-log');
+            logElement.innerHTML += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[TEST] ${message}`);
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // 1. 基础功能测试
+        async function testInitialization() {
+            log('开始测试使用量追踪器初始化...');
+
+            try {
+                // 检查 UsageTracker 是否存在
+                if (typeof window.UsageTracker === 'undefined') {
+                    throw new Error('UsageTracker 类未定义');
+                }
+
+                // 检查全局实例是否存在
+                if (!window.usageTracker) {
+                    throw new Error('window.usageTracker 实例未创建');
+                }
+
+                // 检查配置
+                const config = window.getConfig();
+                if (!config.usage) {
+                    throw new Error('使用量配置未找到');
+                }
+
+                log(`✓ UsageTracker 初始化成功`);
+                log(`✓ 日限制: ${config.usage.dailyLimit}`);
+                log(`✓ 月限制: ${config.usage.monthlyLimit}`);
+                log(`✓ 追踪功能: ${config.usage.enableUsageTracking ? '启用' : '禁用'}`);
+
+                testResults.initialization = true;
+                updateStatus('basic-status', '✓ 初始化测试通过', 'success');
+
+            } catch (error) {
+                log(`✗ 初始化测试失败: ${error.message}`, 'error');
+                updateStatus('basic-status', `✗ 初始化测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        function testUsageData() {
+            log('查看当前使用量数据...');
+
+            if (!window.usageTracker) {
+                updateStatus('basic-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const usage = window.usageTracker.getUsage();
+                log(`使用量数据:`);
+                log(`  - 今日: ${usage.daily.count}/${usage.daily.limit} (剩余: ${usage.daily.remaining})`);
+                log(`  - 本月: ${usage.monthly.count}/${usage.monthly.limit} (剩余: ${usage.monthly.remaining})`);
+                log(`  - 最后更新: ${usage.lastUpdated}`);
+                log(`  - 今日日期: ${usage.daily.date}`);
+
+                updateUsageDisplay();
+                updateStatus('basic-status', '✓ 使用量数据获取成功', 'success');
+            } catch (error) {
+                log(`✗ 获取使用量数据失败: ${error.message}`, 'error');
+                updateStatus('basic-status', `✗ 获取失败: ${error.message}`, 'error');
+            }
+        }
+
+        function resetUsageData() {
+            log('重置使用量数据...');
+
+            if (!window.usageTracker) {
+                updateStatus('basic-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                // 清除本地数据
+                localStorage.removeItem('usage_tracker_data');
+
+                // 重新初始化
+                window.usageTracker.usageData.daily.count = 0;
+                window.usageTracker.usageData.monthly.count = 0;
+                window.usageTracker.saveUsage();
+                window.usageTracker.updateUsageDisplay();
+
+                log('✓ 使用量数据已重置');
+                updateStatus('basic-status', '✓ 数据重置成功', 'success');
+                updateUsageDisplay();
+            } catch (error) {
+                log(`✗ 重置失败: ${error.message}`, 'error');
+                updateStatus('basic-status', `✗ 重置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 2. 生成模拟测试
+        async function simulateGeneration() {
+            log('模拟一次成功生成...');
+
+            if (!window.usageTracker) {
+                updateStatus('generation-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const beforeCount = window.usageTracker.getUsage().daily.count;
+
+                // 模拟生成
+                const result = window.usageTracker.trackGeneration({
+                    taskId: 'test_' + Date.now(),
+                    success: true,
+                    timestamp: new Date().toISOString()
+                });
+
+                const afterCount = window.usageTracker.getUsage().daily.count;
+
+                if (result && afterCount === beforeCount + 1) {
+                    log(`✓ 生成模拟成功，计数从 ${beforeCount} 增加到 ${afterCount}`);
+                    updateStatus('generation-status', '✓ 生成模拟成功', 'success');
+                    testResults.generation = true;
+                } else {
+                    throw new Error(`计数未正确增加: ${beforeCount} -> ${afterCount}`);
+                }
+
+                updateUsageDisplay();
+            } catch (error) {
+                log(`✗ 生成模拟失败: ${error.message}`, 'error');
+                updateStatus('generation-status', `✗ 模拟失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateMultipleGenerations(count) {
+            log(`模拟 ${count} 次生成...`);
+
+            for (let i = 0; i < count; i++) {
+                await simulateGeneration();
+                await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟
+            }
+
+            const usage = window.usageTracker.getUsage();
+            log(`✓ 完成 ${count} 次生成模拟，当前计数: ${usage.daily.count}`);
+            updateStatus('generation-status', `✓ 完成 ${count} 次生成`, 'success');
+        }
+
+        async function simulateUntilNearLimit() {
+            log('生成到接近限制（80%）...');
+
+            if (!window.usageTracker) {
+                updateStatus('generation-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const usage = window.usageTracker.getUsage();
+                const targetCount = Math.floor(usage.daily.limit * 0.8);
+
+                while (usage.daily.count < targetCount) {
+                    window.usageTracker.trackGeneration({
+                        taskId: 'test_' + Date.now(),
+                        success: true
+                    });
+
+                    await new Promise(resolve => setTimeout(resolve(50)));
+                }
+
+                log(`✓ 已生成到接近限制: ${usage.daily.count}/${usage.daily.limit}`);
+                updateStatus('generation-status', `✓ 接近限制: ${usage.daily.count}/${usage.daily.limit}`, 'success');
+                updateUsageDisplay();
+            } catch (error) {
+                log(`✗ 生成失败: ${error.message}`, 'error');
+                updateStatus('generation-status', `✗ 失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateUntilLimit() {
+            log('生成到达到限制...');
+
+            if (!window.usageTracker) {
+                updateStatus('generation-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const usage = window.usageTracker.getUsage();
+
+                while (window.usageTracker.checkDailyLimit()) {
+                    window.usageTracker.trackGeneration({
+                        taskId: 'test_' + Date.now(),
+                        success: true
+                    });
+
+                    await new Promise(resolve => setTimeout(resolve(50)));
+                }
+
+                log(`✓ 已达到限制: ${usage.daily.count}/${usage.daily.limit}`);
+                updateStatus('generation-status', `✓ 达到限制: ${usage.daily.count}/${usage.daily.limit}`, 'success');
+                updateUsageDisplay();
+            } catch (error) {
+                log(`✗ 生成失败: ${error.message}`, 'error');
+                updateStatus('generation-status', `✗ 失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 3. 限制检查测试
+        function testDailyLimit() {
+            log('测试日限制检查...');
+
+            if (!window.usageTracker) {
+                updateStatus('limit-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const canGenerate = window.usageTracker.checkDailyLimit();
+                const usage = window.usageTracker.getUsage();
+
+                log(`✓ 日限制检查: ${canGenerate ? '可以生成' : '已达限制'}`);
+                log(`  当前使用: ${usage.daily.count}/${usage.daily.limit}`);
+
+                updateStatus('limit-status', `✓ 检查完成: ${canGenerate ? '可生成' : '已达限制'}`, 'success');
+                testResults.limits = true;
+            } catch (error) {
+                log(`✗ 限制检查失败: ${error.message}`, 'error');
+                updateStatus('limit-status', `✗ 检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        function testNearLimit() {
+            log('测试接近限制检查...');
+
+            if (!window.usageTracker) {
+                updateStatus('limit-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                const isNear = window.usageTracker.isNearLimit();
+                const usage = window.usageTracker.getUsage();
+                const percentage = Math.round((usage.daily.count / usage.daily.limit) * 100);
+
+                log(`✓ 接近限制检查: ${isNear ? '接近限制' : '未接近'}`);
+                log(`  使用率: ${percentage}%`);
+
+                updateStatus('limit-status', `✓ 接近限制: ${isNear ? '是' : '否'} (${percentage}%)`, 'info');
+            } catch (error) {
+                log(`✗ 检查失败: ${error.message}`, 'error');
+                updateStatus('limit-status', `✗ 检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 4. 数据持久化测试
+        function testDataPersistence() {
+            log('测试数据持久化...');
+
+            if (!window.usageTracker) {
+                updateStatus('persistence-status', 'UsageTracker 未初始化', 'error');
+                return;
+            }
+
+            try {
+                // 获取当前数据
+                const beforeData = window.usageTracker.getUsage();
+
+                // 保存数据
+                const saved = window.usageTracker.saveUsage();
+
+                // 从 localStorage 读取数据
+                const storedData = JSON.parse(localStorage.getItem('usage_tracker_data'));
+
+                if (saved && storedData &&
+                    storedData.daily.count === beforeData.daily.count) {
+                    log('✓ 数据保存成功');
+                    updateStatus('persistence-status', '✓ 数据持久化正常', 'success');
+                    testResults.persistence = true;
+                } else {
+                    throw new Error('保存的数据不匹配');
+                }
+            } catch (error) {
+                log(`✗ 持久化测试失败: ${error.message}`, 'error');
+                updateStatus('persistence-status', `✗ 测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        function testStorageSync() {
+            log('测试与StorageManager同步...');
+
+            if (!window.storageManager) {
+                log('StorageManager 未可用，跳过同步测试');
+                updateStatus('persistence-status', 'StorageManager 不可用', 'info');
+                return;
+            }
+
+            try {
+                // 获取storageManager中的使用统计
+                const stats = window.storageManager.getUsageStats();
+
+                if (stats && stats.hasOwnProperty('dailyUsage')) {
+                    log(`✓ 与StorageManager同步成功`);
+                    log(`  同步的使用量: ${stats.dailyUsage}`);
+                    updateStatus('persistence-status', '✓ StorageManager同步正常', 'success');
+                } else {
+                    log('StorageManager中暂无使用统计（首次使用正常）');
+                    updateStatus('persistence-status', '✓ 无统计记录（正常）', 'info');
+                }
+            } catch (error) {
+                log(`✗ 同步测试失败: ${error.message}`, 'error');
+                updateStatus('persistence-status', `✗ 同步失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 5. 使用量显示
+        function updateUsageDisplay() {
+            const displayElement = document.getElementById('usage-display');
+
+            if (!window.usageTracker) {
+                displayElement.textContent = 'UsageTracker 未初始化';
+                return;
+            }
+
+            try {
+                const usage = window.usageTracker.getUsage();
+                const dailyPercentage = Math.round((usage.daily.count / usage.daily.limit) * 100);
+                const monthlyPercentage = Math.round((usage.monthly.count / usage.monthly.limit) * 100);
+
+                displayElement.innerHTML = `
+                    <strong>今日使用量</strong>: ${usage.daily.count}/${usage.daily.limit} (${dailyPercentage}%)<br>
+                    <strong>剩余次数</strong>: ${usage.daily.remaining}<br>
+                    <strong>本月使用量</strong>: ${usage.monthly.count}/${usage.monthly.limit} (${monthlyPercentage}%)<br>
+                    <strong>最后更新</strong>: ${new Date(usage.lastUpdated).toLocaleString()}
+                `;
+            } catch (error) {
+                displayElement.textContent = `获取失败: ${error.message}`;
+            }
+        }
+
+        // 6. 日志管理
+        function clearLog() {
+            document.getElementById('test-log').innerHTML = '日志已清空...';
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            log('使用量追踪功能测试页面已加载');
+
+            // 等待其他脚本加载
+            setTimeout(() => {
+                testInitialization();
+                updateUsageDisplay();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

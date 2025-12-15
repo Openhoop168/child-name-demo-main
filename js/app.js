@@ -508,7 +508,7 @@ class ChildrenLiteracyApp {
             }, 50);
 
             // 绑定关闭事件
-            this.bindModalEvents(modal);
+            this.bindUserApiKeyModalEvents(modal);
 
         } catch (error) {
             console.error('显示用户API密钥设置界面失败:', error);
@@ -600,6 +600,7 @@ class ChildrenLiteracyApp {
         const cancelBtn = modal.querySelector('#cancelUserApiKey');
         const guideBtn = modal.querySelector('#showApiKeyGuide');
         const closeBtn = modal.querySelector('.modal-close');
+        const backdrop = modal.querySelector('.modal-backdrop');
 
         // 切换密钥可见性
         toggleBtn.addEventListener('click', () => {
@@ -620,13 +621,29 @@ class ChildrenLiteracyApp {
 
         // 显示指南
         guideBtn.addEventListener('click', () => {
-            this.showApiKeyGetGuide();
+            this.showApiKeyGuide();
         });
 
         // 关闭按钮
         closeBtn.addEventListener('click', () => {
             this.closeModal(modal);
         });
+
+        // 点击背景关闭
+        if (backdrop) {
+            backdrop.addEventListener('click', () => {
+                this.closeModal(modal);
+            });
+        }
+
+        // ESC键关闭
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal(modal);
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
 
         // 回车确认
         input.addEventListener('keypress', (e) => {
@@ -828,7 +845,11 @@ class ChildrenLiteracyApp {
                     await module.instance.initialize();
                 }
             } else {
-                console.warn(`${module.name}未找到`);
+                if (module.name === '安全工具') {
+                    console.warn('SecurityUtils 未加载，某些安全功能可能不可用');
+                } else {
+                    console.warn(`${module.name}未找到`);
+                }
             }
         }
 
@@ -1092,7 +1113,10 @@ class ChildrenLiteracyApp {
             if (window.usageTracker) {
                 const usage = window.usageTracker.getUsage();
                 if (!window.usageTracker.checkDailyLimit()) {
-                    this.showMessage('今日使用次数已达上限，请明天再试', 'error');
+                    this.showMessage(
+                        `今日使用次数已达上限（${usage.daily.count}/${usage.daily.limit}次），请明天再试`,
+                        'error'
+                    );
                     this.isGenerating = false;
                     this.updateGenerateButtonState(false);
                     this.goToStep(2);
@@ -1102,7 +1126,11 @@ class ChildrenLiteracyApp {
                 // 检查是否接近限制
                 if (window.usageTracker.isNearLimit()) {
                     const remaining = usage.daily.remaining;
-                    this.showMessage(`今日剩余生成次数仅剩 ${remaining} 次`, 'warning');
+                    const percentage = Math.round((usage.daily.count / usage.daily.limit) * 100);
+                    this.showMessage(
+                        `今日已使用 ${usage.daily.count}/${usage.daily.limit} 次（${percentage}%），剩余仅 ${remaining} 次`,
+                        'warning'
+                    );
                 }
             }
 
@@ -2246,10 +2274,23 @@ class ChildrenLiteracyApp {
             }
 
             // 验证密钥格式
-            const validation = window.securityUtils.validateApiKeyFormat(apiKey);
-            if (!validation.valid) {
-                this.showMessage(`API密钥格式无效: ${validation.reason}`, 'error');
-                return;
+            if (window.securityUtils && typeof window.securityUtils.validateApiKeyFormat === 'function') {
+                const validation = window.securityUtils.validateApiKeyFormat(apiKey);
+                if (!validation.valid) {
+                    this.showMessage(`API密钥格式无效: ${validation.reason}`, 'error');
+                    return;
+                }
+            } else {
+                // 如果 securityUtils 不可用，使用简单的验证
+                if (!apiKey || apiKey.trim().length < 20) {
+                    this.showMessage('API密钥格式无效：密钥长度过短', 'error');
+                    return;
+                }
+                // 检查是否包含非法字符
+                if (!/^[a-zA-Z0-9\-_]+$/.test(apiKey.trim())) {
+                    this.showMessage('API密钥格式无效：包含非法字符', 'error');
+                    return;
+                }
             }
 
             // 保存密钥

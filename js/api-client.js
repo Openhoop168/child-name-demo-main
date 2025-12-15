@@ -77,16 +77,22 @@ class NanoBananaClient {
         this.config = this.loadConfig();
         this.apiEndpoint = this.config.apiEndpoint;
 
-        // 智能密钥管理：优先使用用户密钥，其次使用默认密钥
+        // 智能密钥管理：优先使用用户密钥，其次使用保存的默认密钥
         const userKey = await this.loadUserApiKey();
+        const savedKey = await this.loadApiKey();
+
         if (userKey) {
             this.apiKey = userKey;
             this.apiKeySource = API_KEY_SOURCE.USER;
             console.log('使用用户API密钥');
+        } else if (savedKey) {
+            this.apiKey = savedKey;
+            this.apiKeySource = API_KEY_SOURCE.DEFAULT;
+            console.log('使用保存的默认API密钥');
         } else if (this.config.apiKey) {
             this.apiKey = this.config.apiKey;
             this.apiKeySource = API_KEY_SOURCE.DEFAULT;
-            console.log('使用默认API密钥');
+            console.log('使用配置文件中的默认API密钥');
         } else {
             this.apiKey = null;
             this.apiKeySource = API_KEY_SOURCE.NONE;
@@ -548,12 +554,13 @@ class NanoBananaClient {
      */
     async saveApiKey(apiKey) {
         try {
-            if (window.securityUtils) {
+            if (window.securityUtils && typeof window.securityUtils.saveSecureData === 'function') {
                 // 使用安全工具加密保存
                 await window.securityUtils.saveSecureData('nano_banana_api_key', apiKey);
             } else {
                 // 直接保存（不安全，仅用于开发）
                 localStorage.setItem('nano_banana_api_key', apiKey);
+                console.warn('SecurityUtils 不可用，API密钥以明文保存');
             }
         } catch (error) {
             console.error('保存API密钥失败:', error);
@@ -567,7 +574,7 @@ class NanoBananaClient {
      */
     async loadUserApiKey() {
         try {
-            if (window.securityUtils) {
+            if (window.securityUtils && typeof window.securityUtils.loadSecureData === 'function') {
                 // 使用安全工具解密加载
                 return await window.securityUtils.loadSecureData('user_nano_banana_api_key');
             } else {
@@ -585,7 +592,7 @@ class NanoBananaClient {
      */
     async loadApiKey() {
         try {
-            if (window.securityUtils) {
+            if (window.securityUtils && typeof window.securityUtils.loadSecureData === 'function') {
                 // 使用安全工具解密加载
                 return await window.securityUtils.loadSecureData('nano_banana_api_key');
             } else {
