@@ -1689,6 +1689,57 @@ textarea:focus {
 }
 
 /* ========================================
+   下载进度条样式
+   ======================================== */
+
+/* 使用量信息区域 */
+.usage-section {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+/* 下载进度条样式 */
+.usage-progress-bar.download {
+    height: 3px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    margin-top: 2px;
+}
+
+.usage-progress-bar.download.normal {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.usage-progress-bar.download.warning {
+    background: linear-gradient(90deg, #ffa726, #ff6f00);
+}
+
+.usage-progress-bar.download.error {
+    background: linear-gradient(90deg, #ef5350, #c62828);
+    animation: progressError 0.5s ease-in-out infinite alternate;
+}
+
+/* 下载信息文字样式 */
+.download-daily,
+.download-monthly {
+    color: #667eea;
+    font-weight: 500;
+}
+
+.download-limit-reached .download-daily,
+.download-limit-reached .download-monthly {
+    color: var(--error-color);
+    font-weight: 600;
+}
+
+.download-near-limit .download-daily,
+.download-near-limit .download-monthly {
+    color: var(--warning-color);
+    font-weight: 600;
+}
+
+/* ========================================
    通知系统样式
    ======================================== */
 
@@ -1983,12 +2034,24 @@ textarea:focus {
 /* 超小屏幕 */
 @media (max-width: 480px) {
     .usage-daily,
-    .usage-monthly {
+    .usage-monthly,
+    .download-daily,
+    .download-monthly {
         font-size: 0.8rem;
     }
 
+    .usage-section {
+        font-size: 10px;
+        margin-bottom: 2px;
+    }
+
     .usage-progress-container {
-        height: 4px;
+        height: 6px;
+    }
+
+    .usage-progress-bar.download {
+        height: 2px;
+        margin-top: 1px;
     }
 
     .usage-notification-content {

@@ -263,16 +263,31 @@
 
 ### 2.3 下载次数控制（商业化增强）
 
-#### 任务13.1：设计下载控制系统
-- **文件**：`js/usage-tracker.js`
+#### 任务13.1：设计下载控制系统 ✅
+- **文件**：`js/usage-tracker.js`、`config.template.js`、`css/style.css`、`js/app.js`
 - **内容**：
-  - [ ] 扩展 UsageTracker 类，添加下载次数追踪
-  - [ ] 实现 `trackDownload()` 方法
-  - [ ] 实现 `checkDownloadLimit()` 方法
-  - [ ] 实现 `showDownloadLimitReached()` 方法
-  - [ ] 添加下载配额配置参数
+  - [x] 扩展 UsageTracker 类，添加下载次数追踪
+  - [x] 实现 `trackDownload()` 方法
+  - [x] 实现 `checkDownloadLimit()` 方法
+  - [x] 实现 `showDownloadLimitReached()` 方法
+  - [x] 添加下载配额配置参数
+  - [x] 实现下载使用量重置方法
+  - [x] 更新UI显示支持下载信息展示
+  - [x] 添加下载进度条和状态样式
+  - [x] 集成下载控制到主应用流程
 - **优先级**：中
 - **预计时间**：4小时
+- **完成时间**：2025-12-15
+- **完成说明**：
+  - 已完整实现下载控制系统，支持独立的日/月下载配额管理
+  - 扩展了UsageTracker类，添加了完整的下载追踪功能集
+  - 实现了8个核心方法：trackDownload、checkDownloadLimit、showDownloadLimitReached、getDownloadUsage、resetDownloadDailyUsage、resetDownloadMonthlyUsage、isNearDownloadLimit、showNearDownloadLimitWarning
+  - 扩展了配置系统，支持下载配额参数和环境变量
+  - 更新了UI显示，支持生成和下载的双进度条展示
+  - 添加了完整的下载状态样式系统，包含正常、警告、错误三种状态
+  - 集成到主应用流程，在下载前检查限制，下载成功后追踪计数
+  - 支持向后兼容，自动处理旧数据结构的升级
+  - 包含完善的错误处理和用户提示系统
 
 #### 任务13.2：集成下载控制到生成流程
 - **文件**：`js/app.js`

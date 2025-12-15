@@ -48,13 +48,30 @@ window.APP_CONFIG = {
     },
 
     // ================================
+    // 下载控制配置
+    // ================================
+    download: {
+        dailyLimit: parseInt("{{DAILY_DOWNLOAD_LIMIT}}") || 50,
+        monthlyLimit: parseInt("{{MONTHLY_DOWNLOAD_LIMIT}}") || 1000,
+        enableDownloadTracking: "{{ENABLE_DOWNLOAD_TRACKING}}" !== "false",
+        resetTime: "00:00:00", // 每日重置时间
+        warningThreshold: 0.8, // 达到80%时显示警告
+        // 下载配额与生成配额的比例
+        quotaRatio: {
+            daily: 0.5,    // 下载配额是生成配额的50%
+            monthly: 0.33  // 下载配额是生成配额的33%
+        }
+    },
+
+    // ================================
     // 功能开关
     // ================================
     features: {
         usageStats: "{{ENABLE_USAGE_STATS}}" !== "false",
         generationHistory: "{{ENABLE_GENERATION_HISTORY}}" !== "false",
         customVocabulary: "{{ENABLE_CUSTOM_VOCABULARY}}" !== "false",
-        enableUsageTracking: "{{ENABLE_USAGE_TRACKING}}" !== "false"
+        enableUsageTracking: "{{ENABLE_USAGE_TRACKING}}" !== "false",
+        enableDownloadTracking: "{{ENABLE_DOWNLOAD_TRACKING}}" !== "false"
     },
 
     // ================================
@@ -192,6 +209,23 @@ window.APP_CONFIG = {
                 max: 1.0,
                 default: 0.8
             }
+        },
+        download: {
+            dailyLimit: {
+                min: 1,
+                max: 5000,
+                default: 50
+            },
+            monthlyLimit: {
+                min: 5,
+                max: 50000,
+                default: 1000
+            },
+            warningThreshold: {
+                min: 0.1,
+                max: 1.0,
+                default: 0.8
+            }
         }
     },
 
@@ -207,14 +241,18 @@ window.APP_CONFIG = {
             configError: "配置错误，请检查环境变量设置",
             browserUnsupported: "您的浏览器不支持某些必需功能，请升级浏览器",
             dailyLimitExceeded: "今日使用次数已达上限，请明天再试",
-            monthlyLimitExceeded: "本月使用次数已达上限，请下月再试"
+            monthlyLimitExceeded: "本月使用次数已达上限，请下月再试",
+            dailyDownloadLimitExceeded: "今日下载次数已达上限，请明天再试",
+            monthlyDownloadLimitExceeded: "本月下载次数已达上限，请下月再试",
+            downloadLimitExceeded: "下载次数已达上限，请升级套餐或明天再试"
         },
         success: {
             configLoaded: "配置加载成功",
             apiKeySaved: "API密钥保存成功",
             imageGenerated: "图片生成成功",
             imageDownloaded: "图片下载成功",
-            usageReset: "使用量统计已重置"
+            usageReset: "使用量统计已重置",
+            downloadUsageReset: "下载使用量统计已重置"
         },
         warnings: {
             apiKeyDeprecated: "API密钥可能已过期，请检查",
@@ -222,7 +260,10 @@ window.APP_CONFIG = {
             storageQuota: "本地存储空间不足，建议清理历史记录",
             dailyLimitWarning: "今日使用次数即将达到上限",
             monthlyLimitWarning: "本月使用次数即将达到上限",
-            usageTrackingDisabled: "使用量追踪功能已关闭"
+            usageTrackingDisabled: "使用量追踪功能已关闭",
+            dailyDownloadLimitWarning: "今日下载次数即将达到上限",
+            monthlyDownloadLimitWarning: "本月下载次数即将达到上限",
+            downloadTrackingDisabled: "下载使用量追踪功能已关闭"
         }
     },
 
@@ -307,9 +348,40 @@ window.validateConfig = function() {
         errors.push("月使用量限制必须大于或等于日使用量限制");
     }
 
+    // 验证下载限制配置
+    const downloadValidation = config.validation.download;
+
+    if (config.download.dailyLimit < downloadValidation.dailyLimit.min ||
+        config.download.dailyLimit > downloadValidation.dailyLimit.max) {
+        warnings.push(`日下载限制超出合理范围，将使用默认值 ${downloadValidation.dailyLimit.default}`);
+        config.download.dailyLimit = downloadValidation.dailyLimit.default;
+    }
+
+    if (config.download.monthlyLimit < downloadValidation.monthlyLimit.min ||
+        config.download.monthlyLimit > downloadValidation.monthlyLimit.max) {
+        warnings.push(`月下载限制超出合理范围，将使用默认值 ${downloadValidation.monthlyLimit.default}`);
+        config.download.monthlyLimit = downloadValidation.monthlyLimit.default;
+    }
+
+    if (config.download.warningThreshold < downloadValidation.warningThreshold.min ||
+        config.download.warningThreshold > downloadValidation.warningThreshold.max) {
+        warnings.push(`下载警告阈值超出合理范围，将使用默认值 ${downloadValidation.warningThreshold.default}`);
+        config.download.warningThreshold = downloadValidation.warningThreshold.default;
+    }
+
+    // 验证下载月限制必须大于日限制
+    if (config.download.monthlyLimit < config.download.dailyLimit) {
+        errors.push("月下载限制必须大于或等于日下载限制");
+    }
+
     // 检查使用量追踪功能是否启用
     if (!config.usage.enableUsageTracking) {
         warnings.push("使用量追踪功能已关闭，无法记录使用统计");
+    }
+
+    // 检查下载追踪功能是否启用
+    if (!config.download.enableDownloadTracking) {
+        warnings.push("下载使用量追踪功能已关闭，无法记录下载统计");
     }
 
     // 检查浏览器支持

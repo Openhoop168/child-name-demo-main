@@ -1398,6 +1398,12 @@ class ChildrenLiteracyApp {
      */
     async downloadImage() {
         try {
+            // 1. 检查下载限制
+            if (window.usageTracker && !window.usageTracker.checkDownloadLimit()) {
+                // 限制提示已在 checkDownloadLimit 中处理
+                return;
+            }
+
             const imageUrl = this.elements.generatedImage.src;
             const filename = window.promptGenerator.generateFileName(
                 this.currentPromptData.metadata.theme,
@@ -1406,15 +1412,29 @@ class ChildrenLiteracyApp {
 
             const result = await window.nanoBananaClient.downloadImage(imageUrl, filename);
 
+            // 2. 判断下载是否成功
+            let downloadSuccessful = false;
             if (result === true) {
                 // 新窗口下载成功
+                downloadSuccessful = true;
                 this.showMessage('图片下载已开始，请查看下载文件夹', 'success');
             } else if (result && result.fallback === 'download_failed') {
-                // 需要手动下载
+                // 需要手动下载 - 这种情况不计入成功下载
                 this.showDownloadFallback(imageUrl, filename, result.error);
-            } else {
+            } else if (result) {
                 // Blob下载成功
+                downloadSuccessful = true;
                 this.showMessage('图片下载成功', 'success');
+            }
+
+            // 3. 追踪成功的下载
+            if (downloadSuccessful && window.usageTracker) {
+                window.usageTracker.trackDownload({
+                    taskId: this.currentTaskId,
+                    theme: this.currentPromptData.metadata.theme,
+                    title: this.currentPromptData.metadata.title,
+                    timestamp: new Date().toISOString()
+                });
             }
 
         } catch (error) {
