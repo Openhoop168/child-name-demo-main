@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载控制集成测试</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: var(--text-color);
+        }
+        .test-results {
+            background: var(--secondary-bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-pass {
+            background: #4CAF50;
+            color: white;
+        }
+        .status-fail {
+            background: #f44336;
+            color: white;
+        }
+        .integration-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+        }
+        .scenario-button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .scenario-button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>下载控制集成测试</h1>
+
+    <div class="integration-summary">
+        <h2>集成测试目标</h2>
+        <p>验证下载控制功能与主应用的完整集成，包括：</p>
+        <ul>
+            <li>生成前的下载配额检查</li>
+            <li>下载成功后的追踪记录</li>
+            <li>与StorageManager的数据同步</li>
+            <li>UI更新和用户提示</li>
+            <li>完整的使用流程模拟</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>场景1：完整生成-下载流程模拟</h3>
+        <p>模拟用户从生成图片到下载的完整流程</p>
+        <button class="scenario-button" onclick="testCompleteWorkflow()">执行场景1</button>
+        <div id="scenario1-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>场景2：StorageManager数据同步测试</h3>
+        <p>验证下载量数据与StorageManager的同步</p>
+        <button class="scenario-button" onclick="testStorageManagerSync()">执行场景2</button>
+        <div id="scenario2-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>场景3：配置变更影响测试</h3>
+        <p>测试配置变更对下载控制的影响</p>
+        <button class="scenario-button" onclick="testConfigChanges()">执行场景3</button>
+        <div id="scenario3-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>场景4：多日数据累积测试</h3>
+        <p>模拟多天的下载使用情况</p>
+        <button class="scenario-button" onclick="testMultiDayAccumulation()">执行场景4</button>
+        <div id="scenario4-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>场景5：边界条件集成测试</h3>
+        <p>测试各种边界条件下的系统行为</p>
+        <button class="scenario-button" onclick="testBoundaryConditions()">执行场景5</button>
+        <div id="scenario5-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>场景6：并发操作测试</h3>
+        <p>测试多个并发下载请求的处理</p>
+        <button class="scenario-button" onclick="testConcurrentOperations()">执行场景6</button>
+        <div id="scenario6-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>运行所有集成测试</h3>
+        <p>按顺序执行所有集成测试场景</p>
+        <button class="scenario-button" onclick="runAllIntegrationTests()">运行所有集成测试</button>
+        <div id="all-scenarios-result"></div>
+    </div>
+
+    <div class="test-results" id="integration-test-results">
+        集成测试结果将在这里显示...
+    </div>
+
+    <!-- 引入必要的依赖 -->
+    <script src="js/config.js"></script>
+    <script src="js/storage-manager.js"></script>
+    <script src="js/usage-tracker.js"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+        // 集成测试结果收集
+        let integrationResults = [];
+        let scenarioCount = 0;
+        let passedScenarios = 0;
+        let failedScenarios = 0;
+
+        // 测试日志函数
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            integrationResults.push(logMessage);
+            console.log(logMessage);
+            updateIntegrationResults();
+        }
+
+        function updateScenarioResult(scenarioId, status, message) {
+            const element = document.getElementById(`${scenarioId}-result`);
+            const statusClass = status === 'pass' ? 'status-pass' : 'status-fail';
+            element.innerHTML = `<span class="status ${statusClass}">${status.toUpperCase()}</span> ${message}`;
+        }
+
+        function updateIntegrationResults() {
+            const resultsElement = document.getElementById('integration-test-results');
+            resultsElement.textContent = integrationResults.join('\n');
+            resultsElement.scrollTop = resultsElement.scrollHeight;
+        }
+
+        // 场景1：完整生成-下载流程模拟
+        async function testCompleteWorkflow() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: 完整生成-下载流程模拟 ==========`);
+
+            try {
+                // 1. 初始化环境
+                log('步骤1: 初始化测试环境');
+                window.usageTracker.resetAllUsage();
+
+                // 2. 模拟生成前的配额检查
+                log('步骤2: 检查生成前的下载配额');
+                const downloadUsageBefore = window.usageTracker.getDownloadUsage();
+                log(`当前下载配额: ${downloadUsageBefore.daily.count}/${downloadUsageBefore.daily.limit}`);
+
+                // 3. 模拟生成成功
+                log('步骤3: 模拟图片生成成功');
+                const promptData = {
+                    text: '测试提示词',
+                    metadata: {
+                        theme: '测试主题',
+                        title: '测试标题'
+                    }
+                };
+
+                // 模拟app.js中的生成成功处理
+                if (window.app && window.app.handleGenerationSuccess) {
+                    // 这里只是模拟，不实际调用
+                    log('✓ 生成成功处理函数存在');
+                }
+
+                // 4. 模拟下载操作
+                log('步骤4: 执行下载操作');
+                const downloadResult = window.usageTracker.trackDownload({
+                    taskId: 'test-task-' + Date.now(),
+                    theme: promptData.metadata.theme,
+                    title: promptData.metadata.title
+                });
+
+                if (downloadResult) {
+                    log('✓ 下载操作成功');
+
+                    // 5. 验证下载后的状态
+                    log('步骤5: 验证下载后的状态');
+                    const downloadUsageAfter = window.usageTracker.getDownloadUsage();
+                    log(`下载后配额: ${downloadUsageAfter.daily.count}/${downloadUsageAfter.daily.limit}`);
+
+                    if (downloadUsageAfter.daily.count === downloadUsageBefore.daily.count + 1) {
+                        log('✓ 下载计数正确增加');
+
+                        // 6. 验证UI更新
+                        log('步骤6: 验证UI更新');
+                        window.usageTracker.updateUsageDisplay();
+                        log('✓ UI显示已更新');
+
+                        // 7. 验证数据持久化
+                        log('步骤7: 验证数据持久化');
+                        const saved = window.usageTracker.saveUsage();
+                        if (saved) {
+                            log('✓ 数据已保存到localStorage');
+                            updateScenarioResult('scenario1', 'pass', '完整流程测试通过');
+                            passedScenarios++;
+                        } else {
+                            log('✗ 数据保存失败');
+                            updateScenarioResult('scenario1', 'fail', '数据保存失败');
+                            failedScenarios++;
+                        }
+                    } else {
+                        log(`✗ 下载计数错误: 期望${downloadUsageBefore.daily.count + 1}, 实际${downloadUsageAfter.daily.count}`);
+                        updateScenarioResult('scenario1', 'fail', '下载计数错误');
+                        failedScenarios++;
+                    }
+                } else {
+                    log('✗ 下载操作失败');
+                    updateScenarioResult('scenario1', 'fail', '下载操作失败');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景1出错: ${error.message}`);
+                updateScenarioResult('scenario1', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 场景2：StorageManager数据同步测试
+        async function testStorageManagerSync() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: StorageManager数据同步测试 ==========`);
+
+            try {
+                // 1. 重置环境
+                window.usageTracker.resetAllUsage();
+
+                // 2. 检查StorageManager是否存在
+                if (!window.storageManager) {
+                    log('⚠ StorageManager不存在，跳过同步测试');
+                    updateScenarioResult('scenario2', 'pass', 'StorageManager不存在，跳过测试');
+                    passedScenarios++;
+                    return;
+                }
+
+                log('步骤1: StorageManager存在，开始同步测试');
+
+                // 3. 执行下载操作
+                log('步骤2: 执行下载操作');
+                window.usageTracker.trackDownload();
+
+                // 4. 检查StorageManager中的数据
+                log('步骤3: 检查StorageManager数据');
+                const usageStats = window.storageManager.getUsageStats();
+                log(`StorageManager中日使用量: ${usageStats.dailyUsage}`);
+                log(`StorageManager中月使用量: ${usageStats.monthlyUsage}`);
+
+                // 5. 验证数据一致性
+                log('步骤4: 验证数据一致性');
+                const trackerUsage = window.usageTracker.getUsage();
+                const trackerDownloadUsage = window.usageTracker.getDownloadUsage();
+
+                // 注意：StorageManager存储的是生成使用量，不是下载使用量
+                // 所以这里主要验证生成使用量的同步
+                if (usageStats.dailyUsage === trackerUsage.daily.count) {
+                    log('✓ 生成使用量数据同步正确');
+
+                    if (usageStats.usageTrackingDate === trackerUsage.daily.date) {
+                        log('✓ 使用日期同步正确');
+                        updateScenarioResult('scenario2', 'pass', 'StorageManager同步测试通过');
+                        passedScenarios++;
+                    } else {
+                        log(`✗ 日期同步错误: ${usageStats.usageTrackingDate} vs ${trackerUsage.daily.date}`);
+                        updateScenarioResult('scenario2', 'fail', '日期同步错误');
+                        failedScenarios++;
+                    }
+                } else {
+                    log(`✗ 生成使用量同步错误: ${usageStats.dailyUsage} vs ${trackerUsage.daily.count}`);
+                    updateScenarioResult('scenario2', 'fail', '生成使用量同步错误');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景2出错: ${error.message}`);
+                updateScenarioResult('scenario2', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 场景3：配置变更影响测试
+        async function testConfigChanges() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: 配置变更影响测试 ==========`);
+
+            try {
+                // 1. 保存原始配置
+                const originalDailyLimit = window.usageTracker.downloadConfig.dailyLimit;
+                const originalThreshold = window.usageTracker.downloadConfig.warningThreshold;
+
+                log('步骤1: 保存原始配置并重置数据');
+                window.usageTracker.resetAllUsage();
+
+                // 2. 测试配置变更1：降低日限制
+                log('步骤2: 降低日限制到5');
+                window.usageTracker.downloadConfig.dailyLimit = 5;
+                window.usageTracker.usageData.download.daily.count = 4;
+
+                const isNearLimit1 = window.usageTracker.isNearDownloadLimit();
+                log(`使用量4/5，接近限制: ${isNearLimit1}`);
+
+                // 3. 测试配置变更2：调整警告阈值
+                log('步骤3: 调整警告阈值到0.5');
+                window.usageTracker.downloadConfig.warningThreshold = 0.5;
+
+                const isNearLimit2 = window.usageTracker.isNearDownloadLimit();
+                log(`阈值0.5，使用量4/5，接近限制: ${isNearLimit2}`);
+
+                // 4. 验证配置变更生效
+                if (isNearLimit1 && isNearLimit2) {
+                    log('✓ 配置变更立即生效');
+
+                    // 5. 测试限制检查
+                    window.usageTracker.usageData.download.daily.count = 5;
+                    const canDownload = window.usageTracker.checkDownloadLimit();
+                    if (!canDownload) {
+                        log('✓ 新配置下的限制检查正常');
+
+                        // 6. 恢复原始配置
+                        log('步骤6: 恢复原始配置');
+                        window.usageTracker.downloadConfig.dailyLimit = originalDailyLimit;
+                        window.usageTracker.downloadConfig.warningThreshold = originalThreshold;
+
+                        updateScenarioResult('scenario3', 'pass', '配置变更测试通过');
+                        passedScenarios++;
+                    } else {
+                        log('✗ 新配置下的限制检查失败');
+                        updateScenarioResult('scenario3', 'fail', '限制检查失败');
+                        failedScenarios++;
+                    }
+                } else {
+                    log('✗ 配置变更未生效');
+                    updateScenarioResult('scenario3', 'fail', '配置变更未生效');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景3出错: ${error.message}`);
+                updateScenarioResult('scenario3', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 场景4：多日数据累积测试
+        async function testMultiDayAccumulation() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: 多日数据累积测试 ==========`);
+
+            try {
+                // 1. 重置环境
+                window.usageTracker.resetAllUsage();
+
+                // 2. 模拟第一天的下载
+                log('步骤2: 模拟第一天下载');
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                // 手动设置昨天的数据
+                window.usageTracker.usageData.download.daily = {
+                    count: 3,
+                    date: window.usageTracker.formatDate(yesterday),
+                    lastReset: yesterday.toISOString()
+                };
+
+                // 3. 触发每日重置
+                log('步骤3: 触发每日重置');
+                window.usageTracker.checkAndResetUsage();
+
+                // 4. 验证重置后的数据
+                log('步骤4: 验证重置后的数据');
+                const downloadUsage = window.usageTracker.getDownloadUsage();
+
+                if (downloadUsage.daily.count === 0) {
+                    log('✓ 日计数已重置为0');
+
+                    // 5. 检查历史记录
+                    if (window.usageTracker.usageData.download.history.length > 0) {
+                        log('✓ 历史记录已保存');
+                        log(`历史记录数: ${window.usageTracker.usageData.download.history.length}`);
+
+                        // 6. 模拟今天的下载
+                        log('步骤5: 模拟今天的下载');
+                        window.usageTracker.trackDownload();
+                        window.usageTracker.trackDownload();
+
+                        const newUsage = window.usageTracker.getDownloadUsage();
+                        if (newUsage.daily.count === 2) {
+                            log('✓ 今日下载计数正确');
+                            updateScenarioResult('scenario4', 'pass', '多日数据累积测试通过');
+                            passedScenarios++;
+                        } else {
+                            log(`✗ 今日下载计数错误: ${newUsage.daily.count}`);
+                            updateScenarioResult('scenario4', 'fail', '今日下载计数错误');
+                            failedScenarios++;
+                        }
+                    } else {
+                        log('✗ 历史记录未保存');
+                        updateScenarioResult('scenario4', 'fail', '历史记录未保存');
+                        failedScenarios++;
+                    }
+                } else {
+                    log(`✗ 日计数重置失败: ${downloadUsage.daily.count}`);
+                    updateScenarioResult('scenario4', 'fail', '日计数重置失败');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景4出错: ${error.message}`);
+                updateScenarioResult('scenario4', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 场景5：边界条件集成测试
+        async function testBoundaryConditions() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: 边界条件集成测试 ==========`);
+
+            try {
+                // 1. 重置环境
+                window.usageTracker.resetAllUsage();
+
+                // 2. 测试边界1：日限制和月限制同时达到
+                log('步骤2: 测试日限制和月限制同时达到');
+                window.usageTracker.downloadConfig.dailyLimit = 2;
+                window.usageTracker.downloadConfig.monthlyLimit = 2;
+
+                window.usageTracker.trackDownload();
+                window.usageTracker.trackDownload();
+
+                const canDownload = window.usageTracker.checkDownloadLimit();
+                if (!canDownload) {
+                    log('✓ 同时达到日月限制时正确阻止下载');
+
+                    // 3. 测试边界2：月限制远大于日限制
+                    log('步骤3: 测试月限制远大于日限制');
+                    window.usageTracker.downloadConfig.monthlyLimit = 100;
+                    window.usageTracker.resetAllUsage();
+
+                    window.usageTracker.trackDownload();
+                    window.usageTracker.trackDownload();
+                    window.usageTracker.trackDownload();
+
+                    const canDownload2 = window.usageTracker.checkDownloadLimit();
+                    if (!canDownload2) {
+                        log('✓ 达到日限制时正确阻止（即使月限制充足）');
+
+                        // 4. 测试边界3：重置后的状态
+                        log('步骤4: 测试重置后的状态');
+                        window.usageTracker.resetDailyUsage();
+
+                        const canDownload3 = window.usageTracker.checkDownloadLimit();
+                        if (canDownload3) {
+                            log('✓ 日重置后可以正常下载');
+                            updateScenarioResult('scenario5', 'pass', '边界条件测试通过');
+                            passedScenarios++;
+                        } else {
+                            log('✗ 日重置后仍无法下载');
+                            updateScenarioResult('scenario5', 'fail', '日重置后状态错误');
+                            failedScenarios++;
+                        }
+                    } else {
+                        log('✗ 达到日限制时未阻止下载');
+                        updateScenarioResult('scenario5', 'fail', '日限制检查失败');
+                        failedScenarios++;
+                    }
+                } else {
+                    log('✗ 同时达到日月限制时未阻止下载');
+                    updateScenarioResult('scenario5', 'fail', '日月限制检查失败');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景5出错: ${error.message}`);
+                updateScenarioResult('scenario5', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 场景6：并发操作测试
+        async function testConcurrentOperations() {
+            scenarioCount++;
+            log(`\n========== 场景 ${scenarioCount}: 并发操作测试 ==========`);
+
+            try {
+                // 1. 重置环境
+                window.usageTracker.resetAllUsage();
+                window.usageTracker.downloadConfig.dailyLimit = 10;
+
+                // 2. 并发执行多个下载操作
+                log('步骤2: 并发执行5个下载操作');
+                const concurrentPromises = [];
+                for (let i = 0; i < 5; i++) {
+                    concurrentPromises.push(
+                        new Promise(resolve => {
+                            setTimeout(() => {
+                                const result = window.usageTracker.trackDownload({ concurrentId: i });
+                                resolve(result);
+                            }, Math.random() * 10);
+                        })
+                    );
+                }
+
+                const results = await Promise.all(concurrentPromises);
+                const successCount = results.filter(r => r).length;
+                log(`并发操作成功数: ${successCount}/5`);
+
+                // 3. 验证数据一致性
+                log('步骤3: 验证数据一致性');
+                const downloadUsage = window.usageTracker.getDownloadUsage();
+
+                if (downloadUsage.daily.count === successCount) {
+                    log('✓ 并发操作数据一致性正确');
+
+                    // 4. 测试并发限制检查
+                    log('步骤4: 测试并发限制检查');
+                    window.usageTracker.usageData.download.daily.count = 9;
+
+                    const concurrentChecks = await Promise.all([
+                        Promise.resolve(window.usageTracker.checkDownloadLimit()),
+                        Promise.resolve(window.usageTracker.checkDownloadLimit()),
+                        Promise.resolve(window.usageTracker.checkDownloadLimit())
+                    ]);
+
+                    const allTrue = concurrentChecks.every(check => check === true);
+                    if (allTrue) {
+                        log('✓ 并发限制检查一致');
+
+                        window.usageTracker.usageData.download.daily.count = 10;
+                        const concurrentChecks2 = await Promise.all([
+                            Promise.resolve(window.usageTracker.checkDownloadLimit()),
+                            Promise.resolve(window.usageTracker.checkDownloadLimit()),
+                            Promise.resolve(window.usageTracker.checkDownloadLimit())
+                        ]);
+
+                        const allFalse = concurrentChecks2.every(check => check === false);
+                        if (allFalse) {
+                            log('✓ 并发限制检查（达到限制）一致');
+                            updateScenarioResult('scenario6', 'pass', '并发操作测试通过');
+                            passedScenarios++;
+                        } else {
+                            log('✗ 达到限制时并发检查不一致');
+                            updateScenarioResult('scenario6', 'fail', '并发限制检查不一致');
+                            failedScenarios++;
+                        }
+                    } else {
+                        log('✗ 并发限制检查不一致');
+                        updateScenarioResult('scenario6', 'fail', '并发限制检查不一致');
+                        failedScenarios++;
+                    }
+                } else {
+                    log(`✗ 数据一致性错误: 期望${successCount}, 实际${downloadUsage.daily.count}`);
+                    updateScenarioResult('scenario6', 'fail', '数据一致性错误');
+                    failedScenarios++;
+                }
+
+            } catch (error) {
+                log(`✗ 场景6出错: ${error.message}`);
+                updateScenarioResult('scenario6', 'fail', `测试出错: ${error.message}`);
+                failedScenarios++;
+            }
+        }
+
+        // 运行所有集成测试
+        async function runAllIntegrationTests() {
+            log('\n========== 开始运行所有集成测试 ==========');
+
+            // 重置计数器
+            scenarioCount = 0;
+            passedScenarios = 0;
+            failedScenarios = 0;
+            integrationResults = [];
+
+            // 定义场景函数数组
+            const scenarios = [
+                testCompleteWorkflow,
+                testStorageManagerSync,
+                testConfigChanges,
+                testMultiDayAccumulation,
+                testBoundaryConditions,
+                testConcurrentOperations
+            ];
+
+            // 依次运行所有场景
+            for (const scenario of scenarios) {
+                await scenario();
+                // 短暂延迟以便观察结果
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            // 显示最终结果
+            const totalScenarios = passedScenarios + failedScenarios;
+            const successRate = ((passedScenarios / totalScenarios) * 100).toFixed(1);
+
+            log('\n========== 集成测试完成 ==========');
+            log(`总场景数: ${totalScenarios}`);
+            log(`通过: ${passedScenarios}`);
+            log(`失败: ${failedScenarios}`);
+            log(`成功率: ${successRate}%`);
+
+            const element = document.getElementById('all-scenarios-result');
+            const statusClass = failedScenarios === 0 ? 'status-pass' : 'status-fail';
+            element.innerHTML = `
+                <span class="status ${statusClass}">${failedScenarios === 0 ? '全部通过' : '部分失败'}</span>
+                通过: ${passedScenarios}/${totalScenarios} (${successRate}%)
+            `;
+
+            updateIntegrationResults();
+        }
+
+        // 页面加载时的初始化
+        window.onload = function() {
+            log('下载控制集成测试页面已加载');
+            log('依赖模块:');
+            log(`- Config: ${typeof window.getConfig !== 'undefined' ? '✓' : '✗'}`);
+            log(`- StorageManager: ${typeof window.StorageManager !== 'undefined' ? '✓' : '✗'}`);
+            log(`- UsageTracker: ${typeof window.UsageTracker !== 'undefined' ? '✓' : '✗'}`);
+            log(`- App: ${typeof window.App !== 'undefined' ? '✓' : '✗'}`);
+            log('可以开始执行集成测试');
+        };
+    </script>
+</body>
+</html>

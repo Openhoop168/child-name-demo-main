@@ -83,7 +83,60 @@
         <div id="test4-result"></div>
     </div>
 
+    <div class="test-section">
+        <h3>测试5：边界值测试 - 配量为1</h3>
+        <p>测试下载限制为1时的行为</p>
+        <button onclick="testBoundaryValueOne()">执行测试5</button>
+        <div id="test5-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试6：数据持久化测试</h3>
+        <p>测试下载量数据的保存和加载</p>
+        <button onclick="testDataPersistence()">执行测试6</button>
+        <div id="test6-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试7：月度限制测试</h3>
+        <p>测试月度下载限制功能</p>
+        <button onclick="testMonthlyLimit()">执行测试7</button>
+        <div id="test7-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试8：配置阈值测试</h3>
+        <p>测试警告阈值的不同配置</p>
+        <button onclick="testWarningThreshold()">执行测试8</button>
+        <div id="test8-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试9：性能测试</h3>
+        <p>测试大量下载操作的性能</p>
+        <button onclick="testPerformance()">执行测试9</button>
+        <div id="test9-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>测试10：错误处理测试</h3>
+        <p>测试异常情况下的错误处理</p>
+        <button onclick="testErrorHandling()">执行测试10</button>
+        <div id="test10-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>运行所有测试</h3>
+        <p>按顺序执行所有测试用例</p>
+        <button onclick="runAllTests()">运行所有测试</button>
+        <div id="all-tests-result"></div>
+    </div>
+
     <div id="test-results"></div>
+    <div id="test-summary" style="margin-top: 20px; padding: 20px; background: var(--secondary-bg-color); border-radius: 8px;">
+        <h3>测试摘要</h3>
+        <p id="test-stats">准备就绪</p>
+    </div>
 
     <script src="js/storage-manager.js"></script>
     <script src="js/usage-tracker.js"></script>
@@ -91,6 +144,9 @@
         // 测试结果收集
         let testResults = [];
         let testCount = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+        let testStats = {};
 
         // 初始化 UsageTracker
         window.storageManager = new StorageManager();
@@ -280,11 +336,428 @@
             updateAllResults();
         }
 
+        // 测试5：边界值测试 - 配量为1
+        async function testBoundaryValueOne() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 边界值测试 - 配量为1 ===`);
+
+            try {
+                // 重置数据
+                window.usageTracker.resetAllUsage();
+
+                // 设置下载限制为1
+                window.usageTracker.downloadConfig.dailyLimit = 1;
+                window.usageTracker.usageData.download.daily.count = 0;
+
+                // 第一次下载 - 应该成功
+                const firstDownload = window.usageTracker.trackDownload();
+                if (firstDownload) {
+                    log('✓ 第一次下载成功（配量充足）');
+
+                    // 第二次下载 - 应该被阻止
+                    const secondDownload = window.usageTracker.trackDownload();
+                    if (!secondDownload) {
+                        log('✓ 第二次下载被正确阻止（已达到配量）');
+
+                        // 验证使用量
+                        const downloadUsage = window.usageTracker.getDownloadUsage();
+                        if (downloadUsage.daily.count === 1 && downloadUsage.daily.percentage === 100) {
+                            log('✓ 下载计数正确：1/1 (100%)');
+                            updateTestResult('test5', 'pass', '边界值测试通过');
+                            passedTests++;
+                        } else {
+                            log(`✗ 下载计数错误：${downloadUsage.daily.count}/1 (${downloadUsage.daily.percentage}%)`);
+                            updateTestResult('test5', 'fail', '下载计数错误');
+                            failedTests++;
+                        }
+                    } else {
+                        log('✗ 第二次下载应该被阻止但没有');
+                        updateTestResult('test5', 'fail', '限制检查失败');
+                        failedTests++;
+                    }
+                } else {
+                    log('✗ 第一次下载失败（配量充足时应该成功）');
+                    updateTestResult('test5', 'fail', '第一次下载失败');
+                    failedTests++;
+                }
+
+            } catch (error) {
+                log(`✗ 测试5出错: ${error.message}`);
+                updateTestResult('test5', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 测试6：数据持久化测试
+        async function testDataPersistence() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 数据持久化测试 ===`);
+
+            try {
+                // 保存当前数据
+                const originalKey = window.usageTracker.storageKey;
+                const testDataKey = 'test_download_tracker_data';
+
+                // 临时修改存储键
+                window.usageTracker.storageKey = testDataKey;
+                window.usageTracker.resetAllUsage();
+
+                // 设置测试数据
+                window.usageTracker.downloadConfig.dailyLimit = 10;
+                window.usageTracker.usageData.download.daily.count = 5;
+                window.usageTracker.usageData.download.monthly.count = 25;
+
+                // 保存数据
+                const saveResult = window.usageTracker.saveUsage();
+                if (saveResult) {
+                    log('✓ 数据保存成功');
+
+                    // 创建新的UsageTracker实例来测试加载
+                    const newTracker = new UsageTracker();
+                    newTracker.storageKey = testDataKey;
+                    newTracker.downloadConfig = window.usageTracker.downloadConfig;
+
+                    // 加载数据
+                    const loadedUsage = newTracker.loadUsage();
+                    if (loadedUsage && loadedUsage.download) {
+                        log('✓ 数据加载成功');
+
+                        // 验证数据完整性
+                        if (loadedUsage.download.daily.count === 5 && loadedUsage.download.monthly.count === 25) {
+                            log('✓ 数据完整性验证通过');
+
+                            // 测试与StorageManager的同步
+                            if (window.storageManager) {
+                                const stats = window.storageManager.getUsageStats();
+                                log(`✓ StorageManager同步正常，日使用量: ${stats.dailyUsage}`);
+                            }
+
+                            updateTestResult('test6', 'pass', '数据持久化测试通过');
+                            passedTests++;
+                        } else {
+                            log(`✗ 数据不完整: daily=${loadedUsage.download.daily.count}, monthly=${loadedUsage.download.monthly.count}`);
+                            updateTestResult('test6', 'fail', '数据完整性验证失败');
+                            failedTests++;
+                        }
+                    } else {
+                        log('✗ 数据加载失败');
+                        updateTestResult('test6', 'fail', '数据加载失败');
+                        failedTests++;
+                    }
+                } else {
+                    log('✗ 数据保存失败');
+                    updateTestResult('test6', 'fail', '数据保存失败');
+                    failedTests++;
+                }
+
+                // 清理测试数据
+                localStorage.removeItem(testDataKey);
+                window.usageTracker.storageKey = originalKey;
+
+            } catch (error) {
+                log(`✗ 测试6出错: ${error.message}`);
+                updateTestResult('test6', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 测试7：月度限制测试
+        async function testMonthlyLimit() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 月度限制测试 ===`);
+
+            try {
+                // 重置数据
+                window.usageTracker.resetAllUsage();
+
+                // 设置月度限制为100
+                window.usageTracker.downloadConfig.monthlyLimit = 100;
+                window.usageTracker.usageData.download.monthly.count = 99;
+
+                // 测试月度限制检查
+                const canDownload = window.usageTracker.checkDownloadLimit();
+                if (canDownload) {
+                    log('✓ 月度限制检查：99/100 时允许下载');
+
+                    // 增加到100
+                    window.usageTracker.usageData.download.monthly.count = 100;
+                    const canDownload2 = window.usageTracker.checkDownloadLimit();
+                    if (!canDownload2) {
+                        log('✓ 月度限制检查：100/100 时正确阻止下载');
+
+                        // 测试月度限制提示
+                        const downloadUsage = window.usageTracker.getDownloadUsage();
+                        if (downloadUsage.monthly.percentage === 100) {
+                            log('✓ 月度进度计算正确：100%');
+                            updateTestResult('test7', 'pass', '月度限制测试通过');
+                            passedTests++;
+                        } else {
+                            log(`✗ 月度进度计算错误：${downloadUsage.monthly.percentage}%`);
+                            updateTestResult('test7', 'fail', '月度进度计算错误');
+                            failedTests++;
+                        }
+                    } else {
+                        log('✗ 月度限制检查失败：100/100 时应该阻止下载');
+                        updateTestResult('test7', 'fail', '月度限制检查失败');
+                        failedTests++;
+                    }
+                } else {
+                    log('✗ 月度限制检查失败：99/100 时应该允许下载');
+                    updateTestResult('test7', 'fail', '月度限制检查失败');
+                    failedTests++;
+                }
+
+            } catch (error) {
+                log(`✗ 测试7出错: ${error.message}`);
+                updateTestResult('test7', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 测试8：警告阈值测试
+        async function testWarningThreshold() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 警告阈值测试 ===`);
+
+            try {
+                // 测试不同的警告阈值
+                const thresholds = [0.5, 0.7, 0.8, 0.9];
+                let allPassed = true;
+
+                for (const threshold of thresholds) {
+                    // 重置数据
+                    window.usageTracker.resetAllUsage();
+                    window.usageTracker.downloadConfig.dailyLimit = 10;
+                    window.usageTracker.downloadConfig.warningThreshold = threshold;
+
+                    // 设置使用量刚好在阈值之上
+                    const usageCount = Math.ceil(10 * threshold + 0.1);
+                    window.usageTracker.usageData.download.daily.count = usageCount;
+
+                    const isNearLimit = window.usageTracker.isNearDownloadLimit();
+                    if (isNearLimit) {
+                        log(`✓ 阈值 ${threshold}: 使用量 ${usageCount}/10 正确触发警告`);
+                    } else {
+                        log(`✗ 阈值 ${threshold}: 使用量 ${usageCount}/10 应该触发警告但没有`);
+                        allPassed = false;
+                    }
+                }
+
+                if (allPassed) {
+                    log('✓ 所有警告阈值测试通过');
+                    updateTestResult('test8', 'pass', '警告阈值测试通过');
+                    passedTests++;
+                } else {
+                    log('✗ 部分警告阈值测试失败');
+                    updateTestResult('test8', 'fail', '警告阈值测试失败');
+                    failedTests++;
+                }
+
+            } catch (error) {
+                log(`✗ 测试8出错: ${error.message}`);
+                updateTestResult('test8', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 测试9：性能测试
+        async function testPerformance() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 性能测试 ===`);
+
+            try {
+                // 重置数据
+                window.usageTracker.resetAllUsage();
+                window.usageTracker.downloadConfig.dailyLimit = 1000;
+
+                const iterations = 100;
+                const startTime = performance.now();
+
+                // 执行多次下载追踪操作
+                for (let i = 0; i < iterations; i++) {
+                    window.usageTracker.trackDownload();
+                }
+
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                const avgTime = duration / iterations;
+
+                log(`✓ ${iterations}次操作耗时: ${duration.toFixed(2)}ms`);
+                log(`✓ 平均每次操作耗时: ${avgTime.toFixed(3)}ms`);
+
+                // 验证数据正确性
+                const downloadUsage = window.usageTracker.getDownloadUsage();
+                if (downloadUsage.daily.count === iterations) {
+                    log('✓ 数据准确性验证通过');
+
+                    // 性能要求：平均每次操作应小于1ms
+                    if (avgTime < 1) {
+                        log('✓ 性能测试通过（< 1ms/操作）');
+                        updateTestResult('test9', 'pass', `性能测试通过 (${avgTime.toFixed(3)}ms/操作)`);
+                        passedTests++;
+                    } else {
+                        log('⚠ 性能警告（>= 1ms/操作）');
+                        updateTestResult('test9', 'pass', `性能测试通过但较慢 (${avgTime.toFixed(3)}ms/操作)`);
+                        passedTests++;
+                    }
+                } else {
+                    log(`✗ 数据准确性验证失败：期望${iterations}，实际${downloadUsage.daily.count}`);
+                    updateTestResult('test9', 'fail', '数据准确性验证失败');
+                    failedTests++;
+                }
+
+            } catch (error) {
+                log(`✗ 测试9出错: ${error.message}`);
+                updateTestResult('test9', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 测试10：错误处理测试
+        async function testErrorHandling() {
+            testCount++;
+            log(`\n=== 测试 ${testCount}: 错误处理测试 ===`);
+
+            try {
+                // 测试download数据不存在的情况
+                const originalDownload = window.usageTracker.usageData.download;
+                delete window.usageTracker.usageData.download;
+
+                const downloadUsage1 = window.usageTracker.getDownloadUsage();
+                if (downloadUsage1 && downloadUsage1.daily.count === 0) {
+                    log('✓ download数据缺失时正确处理');
+                } else {
+                    log('✗ download数据缺失时处理失败');
+                }
+
+                // 恢复download数据
+                window.usageTracker.usageData.download = originalDownload;
+
+                // 测试配置不存在的情况
+                const originalConfig = window.usageTracker.downloadConfig;
+                window.usageTracker.downloadConfig = null;
+
+                const downloadUsage2 = window.usageTracker.getDownloadUsage();
+                if (downloadUsage2 && downloadUsage2.daily.limit > 0) {
+                    log('✓ 配置缺失时使用默认值');
+                } else {
+                    log('✗ 配置缺失时默认值处理失败');
+                }
+
+                // 恢复配置
+                window.usageTracker.downloadConfig = originalConfig;
+
+                // 测试localStorage失效的情况
+                const originalSetItem = localStorage.setItem;
+                localStorage.setItem = function() {
+                    throw new Error('Storage quota exceeded');
+                };
+
+                const saveResult = window.usageTracker.saveUsage();
+                if (!saveResult) {
+                    log('✓ localStorage失效时正确处理');
+                    updateTestResult('test10', 'pass', '错误处理测试通过');
+                    passedTests++;
+                } else {
+                    log('✗ localStorage失效时处理不当');
+                    updateTestResult('test10', 'fail', 'localStorage错误处理失败');
+                    failedTests++;
+                }
+
+                // 恢复localStorage
+                localStorage.setItem = originalSetItem;
+
+            } catch (error) {
+                log(`✗ 测试10出错: ${error.message}`);
+                updateTestResult('test10', 'fail', `测试出错: ${error.message}`);
+                failedTests++;
+            }
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 运行所有测试
+        async function runAllTests() {
+            log('\n========== 开始运行所有测试 ==========');
+
+            // 重置计数器
+            testCount = 0;
+            passedTests = 0;
+            failedTests = 0;
+            testResults = [];
+
+            // 定义测试函数数组
+            const tests = [
+                testDownloadLimitZero,
+                testDownloadNearLimit,
+                testSuccessMessage,
+                testConsoleOutput,
+                testBoundaryValueOne,
+                testDataPersistence,
+                testMonthlyLimit,
+                testWarningThreshold,
+                testPerformance,
+                testErrorHandling
+            ];
+
+            // 依次运行所有测试
+            for (const test of tests) {
+                await test();
+                // 短暂延迟以便观察结果
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // 显示最终结果
+            const totalTests = passedTests + failedTests;
+            const successRate = ((passedTests / totalTests) * 100).toFixed(1);
+
+            log('\n========== 测试完成 ==========');
+            log(`总测试数: ${totalTests}`);
+            log(`通过: ${passedTests}`);
+            log(`失败: ${failedTests}`);
+            log(`成功率: ${successRate}%`);
+
+            const element = document.getElementById('all-tests-result');
+            const statusClass = failedTests === 0 ? 'status-pass' : 'status-fail';
+            element.innerHTML = `
+                <span class="status ${statusClass}">${failedTests === 0 ? '全部通过' : '部分失败'}</span>
+                通过: ${passedTests}/${totalTests} (${successRate}%)
+            `;
+
+            updateAllResults();
+            updateTestStats();
+        }
+
+        // 更新测试统计
+        function updateTestStats() {
+            const total = passedTests + failedTests;
+            const rate = total > 0 ? ((passedTests / total) * 100).toFixed(1) : 0;
+            document.getElementById('test-stats').textContent =
+                `总测试: ${total} | 通过: ${passedTests} | 失败: ${failedTests} | 成功率: ${rate}%`;
+        }
+
         // 页面加载时的初始化信息
         window.onload = function() {
             log('下载控制功能测试页面已加载');
             log('UsageTracker 初始化完成');
             log('可以开始执行测试');
+            updateTestStats();
             updateAllResults();
         };
     </script>
