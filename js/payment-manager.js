@@ -804,6 +804,7 @@ class PaymentManager {
                 // 支付宝支付
                 paymentResult = await paymentApi.createAlipayOrder({
                     orderId: order.orderId,
+                    planId: order.planId,  // 添加planId参数
                     amount: order.amount,
                     subject: `儿童识字小报 - ${plan.name}`,
                     body: `升级到${plan.name}，享受更多功能`,
@@ -815,6 +816,7 @@ class PaymentManager {
                 // 微信支付
                 paymentResult = await paymentApi.createWechatOrder({
                     orderId: order.orderId,
+                    planId: order.planId,  // 添加planId参数
                     amount: order.amount,
                     description: `儿童识字小报 - ${plan.name}`,
                     sceneInfo: {
