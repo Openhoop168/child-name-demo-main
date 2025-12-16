@@ -359,15 +359,36 @@ class UsageTracker {
                 downloadProgressClass = 'warning';
             }
 
+            // 获取当前套餐信息
+            let currentPlanName = '免费版';
+            let showUpgradeButton = false;
+
+            // 初始化支付管理器引用
+            this.initializePaymentManager();
+            if (this.paymentManager) {
+                const subscription = this.paymentManager.getCurrentSubscription();
+                if (subscription && subscription.currentPlan) {
+                    const plan = this.paymentManager.plans[subscription.currentPlan];
+                    currentPlanName = plan ? plan.name : '免费版';
+                    showUpgradeButton = subscription.currentPlan !== 'premium_monthly';
+                } else {
+                    showUpgradeButton = true; // 没有订阅信息时显示升级按钮
+                }
+            } else {
+                showUpgradeButton = true; // 没有支付管理器时显示升级按钮
+            }
+
             usageElement.innerHTML = `
                 <div class="usage-info">
                     <div class="usage-section">
+                        <span class="current-plan-label">${currentPlanName}</span>
                         <span class="usage-daily">生成: ${usage.daily.count}/${usage.daily.limit}</span>
                         <span class="usage-monthly">本月: ${usage.monthly.count}/${usage.monthly.limit}</span>
                     </div>
                     <div class="usage-section">
                         <span class="download-daily">下载: ${downloadUsage.daily.count}/${downloadUsage.daily.limit}</span>
                         <span class="download-monthly">本月: ${downloadUsage.monthly.count}/${downloadUsage.monthly.limit}</span>
+                        ${showUpgradeButton ? `<button class="btn btn-sm btn-primary upgrade-btn" onclick="window.app?.showUpgradeModal()"><i class="fas fa-crown"></i> 升级</button>` : ''}
                     </div>
                 </div>
                 <div class="usage-progress-container">

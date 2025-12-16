@@ -278,6 +278,20 @@
                 <div class="card">
                     <h3><i class="fas fa-cog"></i> API配置</h3>
                     <div class="config-form">
+                        <div class="subscription-management">
+                            <div class="subscription-header">
+                                <div class="subscription-info">
+                                    <h4><i class="fas fa-crown"></i> 套餐管理</h4>
+                                    <p>查看和管理您的订阅套餐</p>
+                                </div>
+                                <button id="manageSubscription" class="btn btn-primary">
+                                    <i class="fas fa-cog"></i> 管理套餐
+                                </button>
+                            </div>
+                            <div id="subscriptionInfo">
+                                <!-- 套餐信息将在这里动态显示 -->
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label for="apiKey">API密钥</label>
                             <div class="input-group">
@@ -352,6 +366,197 @@
         </div>
     </div>
 
+    <!-- 模态框：支付套餐选择 -->
+    <div class="modal payment-modal" id="paymentModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5><i class="fas fa-crown"></i> 选择您的套餐</h5>
+                    <button class="modal-close" id="closePaymentModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="payment-intro">
+                        <h6>升级套餐，享受更多功能</h6>
+                        <p>选择适合您需求的套餐，解锁更多高级功能</p>
+                    </div>
+
+                    <div class="plans-container">
+                        <!-- 套餐卡片将通过 JavaScript 动态生成 -->
+                        <div class="row" id="plansContainer">
+                            <!-- 免费版 -->
+                            <div class="col-md-6 col-lg-3">
+                                <div class="plan-card current-plan" data-plan="free">
+                                    <div class="plan-header">
+                                        <h4 class="plan-name">免费版</h4>
+                                        <div class="plan-price">
+                                            <span class="currency">¥</span>
+                                            <span class="amount">0</span>
+                                            <span class="period">永久</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-features">
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日生成 100 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日下载 50 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>基础主题 (6个)</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-times"></i>
+                                            <span>自定义词汇</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-action">
+                                        <button class="btn btn-outline-primary" disabled>当前套餐</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 基础版 -->
+                            <div class="col-md-6 col-lg-3">
+                                <div class="plan-card" data-plan="basic_monthly">
+                                    <div class="plan-header">
+                                        <h4 class="plan-name">基础版</h4>
+                                        <div class="plan-price">
+                                            <span class="currency">¥</span>
+                                            <span class="amount">9.9</span>
+                                            <span class="period">/月</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-features">
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日生成 500 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日下载 250 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>全部主题</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>自定义词汇</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-action">
+                                        <button class="btn btn-primary select-plan">选择套餐</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 专业版 -->
+                            <div class="col-md-6 col-lg-3">
+                                <div class="plan-card popular-plan" data-plan="pro_monthly">
+                                    <div class="plan-header">
+                                        <h4 class="plan-name">专业版</h4>
+                                        <div class="plan-price">
+                                            <span class="currency">¥</span>
+                                            <span class="amount">29.9</span>
+                                            <span class="period">/月</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-features">
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日生成 2000 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日下载 1000 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>批量生成</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>自定义样式</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-action">
+                                        <button class="btn btn-primary select-plan">选择套餐</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 高级版 -->
+                            <div class="col-md-6 col-lg-3">
+                                <div class="plan-card" data-plan="premium_monthly">
+                                    <div class="plan-header">
+                                        <h4 class="plan-name">高级版</h4>
+                                        <div class="plan-price">
+                                            <span class="currency">¥</span>
+                                            <span class="amount">59.9</span>
+                                            <span class="period">/月</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-features">
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日生成 10000 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>每日下载 5000 次</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>API 访问</span>
+                                        </div>
+                                        <div class="plan-feature">
+                                            <i class="fas fa-check"></i>
+                                            <span>商业授权</span>
+                                        </div>
+                                    </div>
+                                    <div class="plan-action">
+                                        <button class="btn btn-primary select-plan">选择套餐</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="payment-methods">
+                        <h6>支付方式</h6>
+                        <div class="payment-method-options">
+                            <div class="payment-method">
+                                <input type="radio" id="alipay" name="paymentMethod" value="alipay" checked>
+                                <label for="alipay" class="payment-method-label">
+                                    <i class="fab fa-alipay"></i>
+                                    支付宝
+                                </label>
+                            </div>
+                            <div class="payment-method">
+                                <input type="radio" id="wechat" name="paymentMethod" value="wechat">
+                                <label for="wechat" class="payment-method-label">
+                                    <i class="fab fa-weixin"></i>
+                                    微信支付
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" id="cancelPayment">取消</button>
+                    <button class="btn btn-primary" id="confirmPayment" disabled>
+                        <i class="fas fa-lock"></i> 安全支付
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 配置文件（必须在其他脚本之前加载） -->
     <script src="js/config.js"></script>
 
@@ -362,6 +567,7 @@
     <script src="js/security-utils.js"></script>
     <script src="js/prompt-generator.js"></script>
     <script src="js/api-client.js"></script>
+    <script src="js/payment-manager.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

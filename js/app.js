@@ -858,6 +858,12 @@ class ChildrenLiteracyApp {
         if (window.usageTracker) {
             window.usageTracker.updateUsageDisplay();
         }
+
+        // 初始化订阅信息显示
+        this.updateSubscriptionDisplay();
+
+        // 启动订阅状态定期检查
+        this.startSubscriptionStatusCheck();
     }
 
     /**
@@ -3041,6 +3047,14 @@ class ChildrenLiteracyApp {
             });
         }
 
+        // 订阅管理按钮（新添加的）
+        const manageSubscriptionBtn = document.getElementById('manageSubscription');
+        if (manageSubscriptionBtn) {
+            manageSubscriptionBtn.addEventListener('click', () => {
+                this.showUpgradeModal('manage');
+            });
+        }
+
         // 订阅状态显示按钮
         const subscriptionStatusBtn = document.getElementById('subscriptionStatusBtn');
         if (subscriptionStatusBtn) {
@@ -3056,6 +3070,47 @@ class ChildrenLiteracyApp {
 
         window.addEventListener('subscriptionExpired', (event) => {
             this.handleSubscriptionExpired(event.detail);
+        });
+
+        // 支付模态框事件
+        const closePaymentModal = document.getElementById('closePaymentModal');
+        const cancelPayment = document.getElementById('cancelPayment');
+        const confirmPayment = document.getElementById('confirmPayment');
+
+        if (closePaymentModal) {
+            closePaymentModal.addEventListener('click', () => this.hidePaymentModal());
+        }
+
+        if (cancelPayment) {
+            cancelPayment.addEventListener('click', () => this.hidePaymentModal());
+        }
+
+        if (confirmPayment) {
+            confirmPayment.addEventListener('click', () => this.handlePaymentConfirmation());
+        }
+
+        // 套餐卡片选择事件
+        const planCards = document.querySelectorAll('.plan-card');
+        planCards.forEach(card => {
+            card.addEventListener('click', () => this.selectPlan(card.dataset.plan));
+        });
+
+        // 选择套餐按钮事件
+        const selectPlanBtns = document.querySelectorAll('.select-plan');
+        selectPlanBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const planCard = btn.closest('.plan-card');
+                if (planCard) {
+                    this.selectPlan(planCard.dataset.plan);
+                }
+            });
+        });
+
+        // 支付方式选择事件
+        const paymentMethods = document.querySelectorAll('input[name="paymentMethod"]');
+        paymentMethods.forEach(method => {
+            method.addEventListener('change', () => this.updatePaymentMethod());
         });
     }
 
@@ -3074,6 +3129,270 @@ class ChildrenLiteracyApp {
         } catch (error) {
             console.error('显示升级模态框失败:', error);
             this.showMessage('显示升级选项失败', 'error');
+        }
+    }
+
+    /**
+     * 隐藏支付模态框
+     */
+    hidePaymentModal() {
+        try {
+            const paymentModal = document.getElementById('paymentModal');
+            if (paymentModal) {
+                paymentModal.style.display = 'none';
+                // 重置套餐选择状态
+                this.resetPlanSelection();
+            }
+        } catch (error) {
+            console.error('隐藏支付模态框失败:', error);
+        }
+    }
+
+    /**
+     * 选择套餐
+     * @param {string} planId - 套餐ID
+     */
+    selectPlan(planId) {
+        try {
+            // 移除所有套餐卡片的选中状态
+            const planCards = document.querySelectorAll('.plan-card');
+            planCards.forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            // 添加当前套餐卡片的选中状态
+            const selectedCard = document.querySelector(`.plan-card[data-plan="${planId}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+
+                // 启用确认支付按钮
+                const confirmBtn = document.getElementById('confirmPayment');
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.dataset.planId = planId;
+                }
+
+                console.log(`已选择套餐: ${planId}`);
+            }
+        } catch (error) {
+            console.error('选择套餐失败:', error);
+        }
+    }
+
+    /**
+     * 重置套餐选择状态
+     */
+    resetPlanSelection() {
+        try {
+            // 移除所有套餐卡片的选中状态
+            const planCards = document.querySelectorAll('.plan-card');
+            planCards.forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            // 禁用确认支付按钮
+            const confirmBtn = document.getElementById('confirmPayment');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                delete confirmBtn.dataset.planId;
+            }
+        } catch (error) {
+            console.error('重置套餐选择失败:', error);
+        }
+    }
+
+    /**
+     * 处理支付确认
+     */
+    async handlePaymentConfirmation() {
+        try {
+            const confirmBtn = document.getElementById('confirmPayment');
+            const selectedPlanId = confirmBtn?.dataset.planId;
+
+            if (!selectedPlanId) {
+                this.showMessage('请先选择套餐', 'warning');
+                return;
+            }
+
+            // 检查支付管理器
+            if (!window.paymentManager) {
+                this.showMessage('支付管理器未初始化', 'error');
+                return;
+            }
+
+            // 获取支付方式
+            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+            if (!paymentMethod) {
+                this.showMessage('请选择支付方式', 'warning');
+                return;
+            }
+
+            // 显示加载状态
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
+
+            // 处理支付
+            const result = await window.paymentManager.processPayment(selectedPlanId, paymentMethod);
+
+            if (result.success) {
+                // 显示成功消息
+                this.showMessage('支付成功！正在为您升级套餐...', 'success');
+
+                // 隐藏支付模态框
+                this.hidePaymentModal();
+
+                // 显示升级中状态
+                this.showUpgradeProgress();
+
+                // 等待一小段时间后刷新界面
+                setTimeout(() => {
+                    // 刷新订阅显示
+                    this.updateSubscriptionDisplay();
+
+                    // 刷新使用量显示
+                    if (window.usageTracker) {
+                        window.usageTracker.updateUsageDisplay();
+                    }
+
+                    // 显示详细的成功信息
+                    const plan = window.paymentManager?.plans[selectedPlanId];
+                    if (plan) {
+                        this.showUpgradeSuccess(plan);
+                    }
+
+                    // 隐藏升级进度
+                    this.hideUpgradeProgress();
+                }, 2000);
+
+            } else {
+                this.showMessage(result.message || '支付失败，请重试', 'error');
+            }
+
+        } catch (error) {
+            console.error('处理支付确认失败:', error);
+            this.showMessage('支付处理失败，请稍后重试', 'error');
+        } finally {
+            // 恢复按钮状态
+            const confirmBtn = document.getElementById('confirmPayment');
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="fas fa-lock"></i> 安全支付';
+            }
+        }
+    }
+
+    /**
+     * 更新支付方式
+     */
+    updatePaymentMethod() {
+        try {
+            const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+            if (selectedMethod) {
+                console.log(`已选择支付方式: ${selectedMethod}`);
+                // 这里可以根据支付方式显示相应的提示信息
+            }
+        } catch (error) {
+            console.error('更新支付方式失败:', error);
+        }
+    }
+
+    /**
+     * 显示升级进度
+     */
+    showUpgradeProgress() {
+        try {
+            const progressHtml = `
+                <div class="upgrade-progress-overlay" id="upgradeProgress">
+                    <div class="upgrade-progress-content">
+                        <div class="upgrade-icon">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <h3>正在升级套餐</h3>
+                        <p>请稍候，正在为您激活新功能...</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 添加到页面
+            document.body.insertAdjacentHTML('beforeend', progressHtml);
+
+            // 添加进度动画
+            setTimeout(() => {
+                const progressFill = document.querySelector('#upgradeProgress .progress-fill');
+                if (progressFill) {
+                    progressFill.style.width = '100%';
+                }
+            }, 100);
+
+        } catch (error) {
+            console.error('显示升级进度失败:', error);
+        }
+    }
+
+    /**
+     * 隐藏升级进度
+     */
+    hideUpgradeProgress() {
+        try {
+            const progressEl = document.getElementById('upgradeProgress');
+            if (progressEl) {
+                progressEl.remove();
+            }
+        } catch (error) {
+            console.error('隐藏升级进度失败:', error);
+        }
+    }
+
+    /**
+     * 显示升级成功信息
+     * @param {Object} plan - 套餐信息
+     */
+    showUpgradeSuccess(plan) {
+        try {
+            const successHtml = `
+                <div class="upgrade-success-overlay" id="upgradeSuccess">
+                    <div class="upgrade-success-content">
+                        <div class="success-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h3>升级成功！</h3>
+                        <p>您已成功升级到<strong>${plan.name}</strong></p>
+                        <div class="benefits-list">
+                            <div class="benefit-item">
+                                <i class="fas fa-check"></i>
+                                <span>每日生成 ${plan.features?.dailyGenerations || '更多'} 次</span>
+                            </div>
+                            <div class="benefit-item">
+                                <i class="fas fa-check"></i>
+                                <span>每日下载 ${plan.features?.dailyDownloads || '更多'} 次</span>
+                            </div>
+                            ${plan.features?.customVocabulary ? '<div class="benefit-item"><i class="fas fa-check"></i><span>自定义词汇功能</span></div>' : ''}
+                            ${plan.features?.batchGeneration ? '<div class="benefit-item"><i class="fas fa-check"></i><span>批量生成功能</span></div>' : ''}
+                            ${plan.features?.customStyles ? '<div class="benefit-item"><i class="fas fa-check"></i><span>自定义样式</span></div>' : ''}
+                        </div>
+                        <button class="btn btn-primary" onclick="this.closest('.upgrade-success-overlay').remove()">
+                            开始使用
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 添加到页面
+            document.body.insertAdjacentHTML('beforeend', successHtml);
+
+            // 自动隐藏（10秒后）
+            setTimeout(() => {
+                const successEl = document.getElementById('upgradeSuccess');
+                if (successEl) {
+                    successEl.remove();
+                }
+            }, 10000);
+
+        } catch (error) {
+            console.error('显示升级成功信息失败:', error);
         }
     }
 
@@ -3152,6 +3471,14 @@ class ChildrenLiteracyApp {
                 window.usageTracker.updateUsageDisplay();
             }
 
+            // 更新所有升级按钮状态
+            this.updateUpgradeButtons();
+
+            // 如果有正在进行的生成任务，提示用户新的配额
+            if (this.isGenerating) {
+                this.showMessage('套餐已升级！您现在可以使用更多功能了。', 'success');
+            }
+
         } catch (error) {
             console.error('处理订阅升级事件失败:', error);
         }
@@ -3170,6 +3497,20 @@ class ChildrenLiteracyApp {
 
             // 显示过期消息
             this.showMessage('订阅已过期，请重新购买套餐', 'warning');
+
+            // 更新所有升级按钮状态
+            this.updateUpgradeButtons();
+
+            // 如果有正在进行的生成任务，停止并提示
+            if (this.isGenerating) {
+                this.stopGeneration();
+                this.showMessage('订阅已过期，生成任务已停止。请升级套餐后重试。', 'warning');
+            }
+
+            // 显示升级建议
+            setTimeout(() => {
+                this.showUpgradeModal('expired');
+            }, 2000);
 
         } catch (error) {
             console.error('处理订阅过期事件失败:', error);
@@ -3200,6 +3541,9 @@ class ChildrenLiteracyApp {
             if (window.usageTracker && typeof window.usageTracker.updateUsageDisplay === 'function') {
                 window.usageTracker.updateUsageDisplay();
             }
+
+            // 更新订阅管理区域信息
+            this.updateSubscriptionInfo();
 
         } catch (error) {
             console.error('更新订阅显示失败:', error);
@@ -3232,6 +3576,169 @@ class ChildrenLiteracyApp {
         } catch (error) {
             console.error('更新升级按钮状态失败:', error);
         }
+    }
+
+    /**
+     * 启动订阅状态定期检查
+     */
+    startSubscriptionStatusCheck() {
+        try {
+            // 清除之前的定时器
+            if (this.subscriptionCheckTimer) {
+                clearInterval(this.subscriptionCheckTimer);
+            }
+
+            // 每5分钟检查一次订阅状态
+            this.subscriptionCheckTimer = setInterval(() => {
+                if (window.paymentManager && this.isPaymentAvailable()) {
+                    this.checkSubscriptionStatus();
+                }
+            }, 5 * 60 * 1000); // 5分钟
+
+            // 立即检查一次
+            this.checkSubscriptionStatus();
+
+        } catch (error) {
+            console.error('启动订阅状态检查失败:', error);
+        }
+    }
+
+    /**
+     * 检查订阅状态
+     */
+    async checkSubscriptionStatus() {
+        try {
+            if (!window.paymentManager) return;
+
+            const currentSubscription = window.paymentManager.getCurrentSubscription();
+            if (!currentSubscription) return;
+
+            // 检查是否即将过期（3天内）
+            const endDate = new Date(currentSubscription.endDate);
+            const now = new Date();
+            const daysUntilExpiry = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+
+            if (daysUntilExpiry <= 3 && daysUntilExpiry > 0 && currentSubscription.planStatus === 'active') {
+                // 显示即将过期提示
+                const planName = window.paymentManager.plans[currentSubscription.currentPlan]?.name || '当前套餐';
+                this.showMessage(`${planName}将在${daysUntilExpiry}天后过期，请及时续费`, 'warning');
+            }
+
+            // 检查是否已过期
+            if (daysUntilExpiry <= 0 && currentSubscription.planStatus === 'active') {
+                // 触发订阅过期事件
+                window.paymentManager.handleSubscriptionExpired();
+            }
+
+        } catch (error) {
+            console.error('检查订阅状态失败:', error);
+        }
+    }
+
+    /**
+     * 停止订阅状态检查
+     */
+    stopSubscriptionStatusCheck() {
+        if (this.subscriptionCheckTimer) {
+            clearInterval(this.subscriptionCheckTimer);
+            this.subscriptionCheckTimer = null;
+        }
+    }
+
+    /**
+     * 更新订阅信息显示
+     */
+    updateSubscriptionInfo() {
+        try {
+            const subscriptionInfoEl = document.getElementById('subscriptionInfo');
+            if (!subscriptionInfoEl) return;
+
+            if (window.paymentManager) {
+                const subscription = window.paymentManager.getCurrentSubscription();
+                const plan = subscription ? window.paymentManager.plans[subscription.currentPlan] : null;
+
+                if (subscription && plan) {
+                    const statusClass = this.getSubscriptionStatusClass(subscription.planStatus);
+                    const statusText = this.getSubscriptionStatusText(subscription.planStatus);
+                    const endDate = subscription.endDate ? new Date(subscription.endDate).toLocaleDateString() : null;
+
+                    subscriptionInfoEl.innerHTML = `
+                        <div>
+                            <strong>当前套餐：</strong>${plan.name}
+                            <span class="subscription-status ${statusClass}">${statusText}</span>
+                        </div>
+                        ${endDate ? `<div><strong>到期时间：</strong>${endDate}</div>` : ''}
+                        ${subscription.planStatus === 'active' ?
+                            `<div><strong>剩余天数：</strong>${this.calculateRemainingDays(subscription.endDate)}</div>` : ''}
+                        ${plan.price > 0 ? `<div><strong>套餐费用：</strong>¥${plan.price}/${plan.duration === 'monthly' ? '月' : '永久'}</div>` : ''}
+                    `;
+                } else {
+                    subscriptionInfoEl.innerHTML = `
+                        <div>
+                            <strong>当前套餐：</strong>免费版
+                            <span class="subscription-status status-active">正常</span>
+                        </div>
+                        <div>升级套餐以获得更多功能</div>
+                    `;
+                }
+            } else {
+                subscriptionInfoEl.innerHTML = '<div>加载套餐信息中...</div>';
+            }
+        } catch (error) {
+            console.error('更新订阅信息失败:', error);
+            const subscriptionInfoEl = document.getElementById('subscriptionInfo');
+            if (subscriptionInfoEl) {
+                subscriptionInfoEl.innerHTML = '<div>套餐信息加载失败</div>';
+            }
+        }
+    }
+
+    /**
+     * 获取订阅状态样式类
+     * @param {string} status - 订阅状态
+     * @returns {string} 样式类名
+     */
+    getSubscriptionStatusClass(status) {
+        const statusMap = {
+            'active': 'status-active',
+            'expired': 'status-expired',
+            'grace': 'status-grace',
+            'cancelled': 'status-expired',
+            'pending': 'status-grace'
+        };
+        return statusMap[status] || 'status-grace';
+    }
+
+    /**
+     * 获取订阅状态文本
+     * @param {string} status - 订阅状态
+     * @returns {string} 状态文本
+     */
+    getSubscriptionStatusText(status) {
+        const statusMap = {
+            'active': '正常',
+            'expired': '已过期',
+            'grace': '宽限期',
+            'cancelled': '已取消',
+            'pending': '待激活'
+        };
+        return statusMap[status] || '未知';
+    }
+
+    /**
+     * 计算剩余天数
+     * @param {string} endDate - 结束日期
+     * @returns {number} 剩余天数
+     */
+    calculateRemainingDays(endDate) {
+        if (!endDate) return 0;
+
+        const end = new Date(endDate);
+        const now = new Date();
+        const diffTime = end - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        return Math.max(0, diffDays);
     }
 
     /**
