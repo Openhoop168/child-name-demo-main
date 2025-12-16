@@ -7,7 +7,7 @@ class PaymentManager {
     constructor() {
         // 支付套餐配置
         this.plans = {
-            FREE: {
+            free: {
                 id: 'free',
                 name: '免费版',
                 price: 0,
@@ -28,7 +28,7 @@ class PaymentManager {
                     commercialLicense: false
                 }
             },
-            BASIC_MONTHLY: {
+            basic_monthly: {
                 id: 'basic_monthly',
                 name: '基础版',
                 price: 9.9,
@@ -49,7 +49,7 @@ class PaymentManager {
                     commercialLicense: false
                 }
             },
-            PRO_MONTHLY: {
+            pro_monthly: {
                 id: 'pro_monthly',
                 name: '专业版',
                 price: 29.9,
@@ -70,7 +70,7 @@ class PaymentManager {
                     commercialLicense: false
                 }
             },
-            PREMIUM_MONTHLY: {
+            premium_monthly: {
                 id: 'premium_monthly',
                 name: '高级版',
                 price: 59.9,
@@ -253,7 +253,7 @@ class PaymentManager {
      * 降级到免费版
      */
     async downgradeToFree() {
-        const freePlan = this.plans.FREE;
+        const freePlan = this.plans.free;
 
         this.currentSubscription = {
             ...this.currentSubscription,
