@@ -834,6 +834,7 @@ class ChildrenLiteracyApp {
             { name: '词汇管理器', instance: window.vocabularyManager },
             { name: '存储管理器', instance: window.storageManager },
             { name: '使用量追踪器', instance: window.usageTracker },
+            { name: '支付管理器', instance: window.paymentManager },
             { name: '安全工具', instance: window.securityUtils },
             { name: 'API客户端', instance: window.nanoBananaClient }
         ];
@@ -978,6 +979,9 @@ class ChildrenLiteracyApp {
         // 输入框实时验证
         this.elements.themeInput.addEventListener('input', () => this.validateThemeInput());
         this.elements.titleInput.addEventListener('input', () => this.validateTitleInput());
+
+        // 支付相关事件
+        this.bindPaymentEventListeners();
 
         // 键盘快捷键
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
@@ -3009,6 +3013,271 @@ class ChildrenLiteracyApp {
         } catch (error) {
             console.error('清空历史记录失败:', error);
             this.showMessage('清空失败', 'error');
+        }
+    }
+
+    // ================================
+    // 支付相关方法
+    // ================================
+
+    /**
+     * 绑定支付相关事件监听器
+     */
+    bindPaymentEventListeners() {
+        // 升级套餐按钮
+        const upgradeBtns = document.querySelectorAll('.upgrade-btn, [data-action="upgrade"]');
+        upgradeBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showUpgradeModal();
+            });
+        });
+
+        // 套餐管理按钮
+        const managePlanBtn = document.getElementById('managePlanBtn');
+        if (managePlanBtn) {
+            managePlanBtn.addEventListener('click', () => {
+                this.showUpgradeModal('manage');
+            });
+        }
+
+        // 订阅状态显示按钮
+        const subscriptionStatusBtn = document.getElementById('subscriptionStatusBtn');
+        if (subscriptionStatusBtn) {
+            subscriptionStatusBtn.addEventListener('click', () => {
+                this.showSubscriptionStatus();
+            });
+        }
+
+        // 监听支付相关自定义事件
+        window.addEventListener('subscriptionUpgraded', (event) => {
+            this.handleSubscriptionUpgraded(event.detail);
+        });
+
+        window.addEventListener('subscriptionExpired', (event) => {
+            this.handleSubscriptionExpired(event.detail);
+        });
+    }
+
+    /**
+     * 显示升级模态框
+     * @param {string} triggerReason - 触发原因
+     */
+    showUpgradeModal(triggerReason = 'upgrade') {
+        try {
+            if (window.paymentManager && typeof window.paymentManager.showPaymentModal === 'function') {
+                window.paymentManager.showPaymentModal(triggerReason);
+            } else {
+                console.warn('支付管理器未初始化');
+                this.showMessage('支付功能暂时不可用', 'warning');
+            }
+        } catch (error) {
+            console.error('显示升级模态框失败:', error);
+            this.showMessage('显示升级选项失败', 'error');
+        }
+    }
+
+    /**
+     * 显示订阅状态
+     */
+    showSubscriptionStatus() {
+        try {
+            if (!window.paymentManager) {
+                this.showMessage('支付管理器未初始化', 'error');
+                return;
+            }
+
+            const subscription = window.paymentManager.getCurrentSubscription();
+            if (!subscription) {
+                this.showMessage('无法获取订阅信息', 'error');
+                return;
+            }
+
+            const plan = window.paymentManager.plans[subscription.currentPlan];
+            const statusText = this.getSubscriptionStatusText(subscription);
+            const expiryText = subscription.endDate ?
+                `到期时间: ${new Date(subscription.endDate).toLocaleDateString()}` :
+                '永久有效';
+
+            const message = `
+                当前套餐: ${plan.name}
+                状态: ${statusText}
+                ${expiryText}
+            `;
+
+            this.showMessage(message, 'info');
+        } catch (error) {
+            console.error('显示订阅状态失败:', error);
+            this.showMessage('获取订阅状态失败', 'error');
+        }
+    }
+
+    /**
+     * 获取订阅状态文本
+     * @param {Object} subscription - 订阅信息
+     * @returns {string} 状态文本
+     */
+    getSubscriptionStatusText(subscription) {
+        const statusMap = {
+            'active': '正常',
+            'expired': '已过期',
+            'cancelled': '已取消',
+            'pending': '待支付'
+        };
+
+        return statusMap[subscription.planStatus] || '未知';
+    }
+
+    /**
+     * 处理订阅升级事件
+     * @param {Object} detail - 事件详情
+     */
+    handleSubscriptionUpgraded(detail) {
+        try {
+            console.log('处理订阅升级事件:', detail);
+
+            // 更新UI显示
+            this.updateSubscriptionDisplay();
+
+            // 显示成功消息
+            const oldPlan = window.paymentManager?.plans[detail.oldPlan];
+            const newPlan = window.paymentManager?.plans[detail.newPlan];
+
+            if (oldPlan && newPlan) {
+                this.showMessage(`成功升级到${newPlan.name}！`, 'success');
+            }
+
+            // 刷新使用量显示
+            if (window.usageTracker && typeof window.usageTracker.updateUsageDisplay === 'function') {
+                window.usageTracker.updateUsageDisplay();
+            }
+
+        } catch (error) {
+            console.error('处理订阅升级事件失败:', error);
+        }
+    }
+
+    /**
+     * 处理订阅过期事件
+     * @param {Object} detail - 事件详情
+     */
+    handleSubscriptionExpired(detail) {
+        try {
+            console.log('处理订阅过期事件:', detail);
+
+            // 更新UI显示
+            this.updateSubscriptionDisplay();
+
+            // 显示过期消息
+            this.showMessage('订阅已过期，请重新购买套餐', 'warning');
+
+        } catch (error) {
+            console.error('处理订阅过期事件失败:', error);
+        }
+    }
+
+    /**
+     * 更新订阅显示
+     */
+    updateSubscriptionDisplay() {
+        try {
+            // 更新套餐显示
+            const planElements = document.querySelectorAll('.current-plan-display');
+            if (window.paymentManager) {
+                const subscription = window.paymentManager.getCurrentSubscription();
+                const plan = subscription ? window.paymentManager.plans[subscription.currentPlan] : null;
+                const planName = plan ? plan.name : '免费版';
+
+                planElements.forEach(element => {
+                    element.textContent = planName;
+                });
+            }
+
+            // 更新升级按钮状态
+            this.updateUpgradeButtons();
+
+            // 更新使用量显示
+            if (window.usageTracker && typeof window.usageTracker.updateUsageDisplay === 'function') {
+                window.usageTracker.updateUsageDisplay();
+            }
+
+        } catch (error) {
+            console.error('更新订阅显示失败:', error);
+        }
+    }
+
+    /**
+     * 更新升级按钮状态
+     */
+    updateUpgradeButtons() {
+        try {
+            if (!window.paymentManager) return;
+
+            const subscription = window.paymentManager.getCurrentSubscription();
+            const upgradeBtns = document.querySelectorAll('.upgrade-btn, [data-action="upgrade"]');
+
+            if (subscription && subscription.currentPlan !== 'free') {
+                // 隐藏升级按钮
+                upgradeBtns.forEach(btn => {
+                    btn.style.display = 'none';
+                });
+            } else {
+                // 显示升级按钮
+                upgradeBtns.forEach(btn => {
+                    btn.style.display = 'inline-block';
+                    btn.textContent = '升级套餐';
+                });
+            }
+
+        } catch (error) {
+            console.error('更新升级按钮状态失败:', error);
+        }
+    }
+
+    /**
+     * 检查支付相关功能可用性
+     * @returns {boolean} 是否可用
+     */
+    isPaymentAvailable() {
+        try {
+            // 检查支付管理器
+            if (!window.paymentManager) {
+                console.warn('支付管理器未加载');
+                return false;
+            }
+
+            // 检查支付配置
+            if (window.getConfig && window.getConfig('payment')) {
+                const paymentConfig = window.getConfig('payment');
+                if (!paymentConfig.enabled) {
+                    console.warn('支付功能已禁用');
+                    return false;
+                }
+            }
+
+            // 检查安全工具
+            if (!window.securityUtils) {
+                console.warn('安全工具未加载，支付安全性可能降低');
+            }
+
+            return true;
+        } catch (error) {
+            console.error('检查支付功能可用性失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 初始化支付安全功能
+     */
+    async initializePaymentSecurity() {
+        try {
+            if (window.securityUtils && typeof window.securityUtils.initializePaymentSecurity === 'function') {
+                await window.securityUtils.initializePaymentSecurity();
+                console.log('支付安全功能已初始化');
+            }
+        } catch (error) {
+            console.error('初始化支付安全功能失败:', error);
         }
     }
 }

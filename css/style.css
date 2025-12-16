@@ -2637,47 +2637,520 @@ textarea:focus {
     }
 }
 
+/* ================================
+ * 支付系统样式
+ * ================================ */
+
+/* 支付模态框样式 */
+.payment-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease;
+}
+
+.payment-modal .modal-dialog {
+    max-width: 1200px;
+    margin: 20px auto;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+.payment-modal .modal-content {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.payment-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 20px 30px;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.payment-modal .modal-header h5 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.payment-modal .modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.payment-modal .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.payment-modal .modal-body {
+    padding: 30px;
+}
+
+.payment-modal .modal-footer {
+    background: var(--bg-secondary);
+    padding: 20px 30px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+/* 支付介绍内容 */
+.payment-intro {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.payment-intro h6 {
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.payment-intro p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* 套餐容器 */
+.plans-container {
+    margin-bottom: 30px;
+}
+
+/* 套餐卡片样式 */
+.plan-card {
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-bottom: 20px;
+    transition: var(--transition);
+    cursor: pointer;
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.plan-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.plan-card.selected {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.1);
+}
+
+.plan-card.current-plan {
+    border-color: var(--success-color);
+    background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+}
+
+.plan-card.popular-plan {
+    border-color: var(--warning-color);
+    position: relative;
+}
+
+.plan-card.popular-plan::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, var(--warning-color), var(--primary-color));
+    border-radius: var(--border-radius);
+    z-index: -1;
+}
+
+/* 套餐标签 */
+.popular-badge {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: var(--warning-color);
+    color: var(--text-primary);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: var(--shadow-md);
+}
+
+.current-badge {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: var(--success-color);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: var(--shadow-md);
+}
+
+/* 套餐头部 */
+.plan-header {
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.plan-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.plan-price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 3px;
+    font-weight: 700;
+}
+
+.plan-price .currency {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+}
+
+.plan-price .amount {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+.plan-price .period {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* 套餐功能列表 */
+.plan-features {
+    flex: 1;
+    margin-bottom: 25px;
+}
+
+.plan-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.plan-feature i {
+    width: 16px;
+    color: var(--success-color);
+    font-size: 0.875rem;
+}
+
+/* 套餐操作按钮 */
+.plan-action {
+    text-align: center;
+}
+
+.plan-action .btn {
+    width: 100%;
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.plan-action .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 支付方式选择 */
+.payment-methods {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.payment-methods h6 {
+    margin-bottom: 15px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.payment-method-options {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.payment-method {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    background: white;
+    min-width: 150px;
+}
+
+.payment-method:hover {
+    border-color: var(--primary-color);
+}
+
+.payment-method input[type="radio"] {
+    margin: 0;
+}
+
+.payment-method input[type="radio"]:checked + .payment-method-label {
+    color: var(--primary-color);
+}
+
+.payment-method i {
+    font-size: 1.25rem;
+    color: var(--primary-color);
+}
+
+/* 支付按钮样式 */
+.payment-modal .modal-footer .btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 12px 30px;
+    border-radius: 8px;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-modal .modal-footer .btn-primary:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.payment-modal .modal-footer .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 支付处理状态 */
+.btn-primary .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .payment-modal .modal-dialog {
+        margin: 10px;
+        max-height: calc(100vh - 20px);
+    }
+
+    .payment-modal .modal-header,
+    .payment-modal .modal-body,
+    .payment-modal .modal-footer {
+        padding: 20px;
+    }
+
+    .plans-container .row {
+        gap: 15px;
+    }
+
+    .plans-container .col-md-6,
+    .plans-container .col-lg-3 {
+        flex: 0 0 calc(50% - 8px);
+        max-width: calc(50% - 8px);
+    }
+
+    .payment-method-options {
+        flex-direction: column;
+    }
+
+    .payment-method {
+        width: 100%;
+    }
+
+    .payment-modal .modal-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .payment-modal .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .plans-container .col-md-6,
+    .plans-container .col-lg-3 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .plan-price .amount {
+        font-size: 2rem;
+    }
+
+    .payment-intro h6 {
+        font-size: 1.1rem;
+    }
+}
+
 /* 高对比度模式 */
 @media (prefers-contrast: high) {
-    .download-limit-modal .modal-content {
+    .plan-card {
         border-width: 3px;
     }
 
-    .download-warning-content {
+    .payment-modal .modal-content {
         border-width: 3px;
     }
 
-    .download-limit-info {
-        border: 1px solid var(--border-color);
-    }
-
-    .download-limit-progress-bar {
-        border: 1px solid var(--border-color);
+    .payment-method {
+        border-width: 3px;
     }
 }
 
 /* 深色模式适配 */
 @media (prefers-color-scheme: dark) {
-    .download-limit-modal .modal-content {
-        background: linear-gradient(135deg, #4a3426 0%, #5d4037 100%);
-        border-color: var(--warning-color);
+    .payment-modal .modal-content {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+        border-color: var(--primary-color);
     }
 
-    .download-limit-info {
-        background: var(--bg-secondary);
+    .payment-modal .modal-header {
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    }
+
+    .payment-modal .modal-body {
         color: var(--text-primary);
     }
 
-    .download-warning-content {
-        background: linear-gradient(135deg, #4a3426 0%, #5d4037 100%);
+    .payment-modal .modal-footer {
+        background: #2d3748;
+        border-color: var(--border-color);
+    }
+
+    .plan-card {
+        background: #2d3748;
+        border-color: var(--border-color);
         color: var(--text-primary);
     }
 
-    .download-limit-row .value {
-        color: var(--warning-color);
+    .plan-card.selected {
+        background: linear-gradient(135deg, #4a3426 0%, #5d4037 100%);
+        border-color: var(--primary-color);
     }
 
-    .download-limit-row .value.exceeded {
-        color: var(--error-color);
+    .plan-card.current-plan {
+        background: linear-gradient(135deg, #1a3d1a 0%, #2d5a2d 100%);
+        border-color: var(--success-color);
     }
+
+    .plan-name {
+        color: var(--text-primary);
+    }
+
+    .plan-feature {
+        color: var(--text-secondary);
+    }
+
+    .payment-methods {
+        background: #2d3748;
+        border-color: var(--border-color);
+    }
+
+    .payment-method {
+        background: #1a202c;
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    .payment-methods h6 {
+        color: var(--text-primary);
+    }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.plan-card {
+    animation: slideIn 0.3s ease;
+}
+
+.plan-card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.plan-card:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.plan-card:nth-child(4) {
+    animation-delay: 0.3s;
 }

@@ -870,6 +870,501 @@ class SecurityUtils {
             return { cleanedCount: 0 };
         }
     }
+
+    // ================================
+    // 支付安全功能
+    // ================================
+
+    /**
+     * 初始化支付安全功能
+     */
+    async initializePaymentSecurity() {
+        try {
+            // 生成支付专用加密密钥
+            this.paymentEncryptionKey = this.generateRandomString(128);
+
+            // 验证支付安全配置
+            this.validatePaymentSecurityConfig();
+
+            console.log('[SecurityUtils] 支付安全功能已初始化');
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付安全功能初始化失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 验证支付安全配置
+     */
+    validatePaymentSecurityConfig() {
+        // 检查必要的加密功能是否可用
+        if (!this.encryptionKey) {
+            throw new Error('基础加密密钥未初始化');
+        }
+
+        if (!this.paymentEncryptionKey) {
+            throw new Error('支付加密密钥未初始化');
+        }
+
+        // 检查浏览器安全特性
+        if (!window.crypto || !window.crypto.subtle) {
+            console.warn('[SecurityUtils] 浏览器不支持高级加密功能，支付安全性可能降低');
+        }
+
+        return true;
+    }
+
+    /**
+     * 加密支付数据
+     * @param {Object} data - 要加密的支付数据
+     * @returns {string} 加密后的数据
+     */
+    encryptPaymentData(data) {
+        try {
+            if (!this.paymentEncryptionKey) {
+                this.initializePaymentSecurity();
+            }
+
+            const jsonString = JSON.stringify(data);
+            const encrypted = this.xorEncrypt(jsonString, this.paymentEncryptionKey);
+
+            // 添加时间戳和校验和
+            const secureData = {
+                data: encrypted,
+                timestamp: Date.now(),
+                checksum: this.generateChecksum(jsonString),
+                version: '1.0'
+            };
+
+            return JSON.stringify(secureData);
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据加密失败:', error);
+            throw new Error('支付数据加密失败');
+        }
+    }
+
+    /**
+     * 解密支付数据
+     * @param {string} encryptedData - 加密的支付数据
+     * @returns {Object} 解密后的支付数据
+     */
+    decryptPaymentData(encryptedData) {
+        try {
+            if (!this.paymentEncryptionKey) {
+                throw new Error('支付加密密钥未初始化');
+            }
+
+            const secureData = JSON.parse(encryptedData);
+
+            // 验证数据完整性
+            if (!this.validatePaymentDataIntegrity(secureData)) {
+                throw new Error('支付数据完整性验证失败');
+            }
+
+            // 检查数据时效性（支付数据5分钟内有效）
+            const maxAge = 5 * 60 * 1000; // 5分钟
+            if (Date.now() - secureData.timestamp > maxAge) {
+                throw new Error('支付数据已过期');
+            }
+
+            const decrypted = this.xorDecrypt(secureData.data, this.paymentEncryptionKey);
+            const data = JSON.parse(decrypted);
+
+            // 验证校验和
+            const currentChecksum = this.generateChecksum(decrypted);
+            if (currentChecksum !== secureData.checksum) {
+                throw new Error('支付数据校验和验证失败');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据解密失败:', error);
+            throw new Error('支付数据解密失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 验证支付数据完整性
+     * @param {Object} secureData - 安全数据对象
+     * @returns {boolean} 验证结果
+     */
+    validatePaymentDataIntegrity(secureData) {
+        try {
+            // 检查必要字段
+            if (!secureData.data || !secureData.timestamp || !secureData.checksum) {
+                return false;
+            }
+
+            // 检查版本
+            if (secureData.version && secureData.version !== '1.0') {
+                console.warn('[SecurityUtils] 不支持的支付数据版本:', secureData.version);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据完整性验证失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 验证支付金额
+     * @param {number} amount - 支付金额
+     * @returns {boolean} 验证结果
+     */
+    validatePaymentAmount(amount) {
+        try {
+            // 检查金额类型
+            if (typeof amount !== 'number' || isNaN(amount)) {
+                return false;
+            }
+
+            // 检查金额范围（0.01 - 99999.99）
+            if (amount < 0.01 || amount > 99999.99) {
+                return false;
+            }
+
+            // 检查小数位数（最多2位）
+            const decimalPlaces = (amount.toString().split('.')[1] || '').length;
+            if (decimalPlaces > 2) {
+                return false;
+            }
+
+            // 验证有效套餐金额
+            const validAmounts = [0, 9.9, 29.9, 59.9]; // 对应套餐价格
+            if (!validAmounts.includes(amount)) {
+                console.warn('[SecurityUtils] 可疑的支付金额:', amount);
+                // 不直接拒绝，但记录警告
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付金额验证失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 生成订单签名
+     * @param {Object} orderInfo - 订单信息
+     * @returns {string} 订单签名
+     */
+    generateOrderSignature(orderInfo) {
+        try {
+            // 构建签名数据
+            const signatureData = {
+                orderId: orderInfo.orderId,
+                amount: orderInfo.amount,
+                planId: orderInfo.planId,
+                userId: orderInfo.userId,
+                timestamp: Date.now()
+            };
+
+            // 生成签名字符串
+            const signatureString = JSON.stringify(signatureData);
+
+            // 使用基础加密密钥生成签名
+            const signature = this.xorEncrypt(signatureString, this.encryptionKey);
+
+            // 转换为Base64格式的签名
+            return btoa(signature.substring(0, 32)); // 取前32个字符作为签名
+        } catch (error) {
+            console.error('[SecurityUtils] 订单签名生成失败:', error);
+            throw new Error('订单签名生成失败');
+        }
+    }
+
+    /**
+     * 验证订单签名
+     * @param {Object} orderInfo - 订单信息
+     * @param {string} signature - 订单签名
+     * @returns {boolean} 验证结果
+     */
+    verifyOrderSignature(orderInfo, signature) {
+        try {
+            if (!orderInfo || !signature) {
+                return false;
+            }
+
+            // 生成期望的签名
+            const expectedSignature = this.generateOrderSignature(orderInfo);
+
+            // 比较签名（使用时间安全的比较方式）
+            return this.constantTimeCompare(signature, expectedSignature);
+        } catch (error) {
+            console.error('[SecurityUtils] 订单签名验证失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 时间安全的字符串比较
+     * @param {string} a - 字符串A
+     * @param {string} b - 字符串B
+     * @returns {boolean} 比较结果
+     */
+    constantTimeCompare(a, b) {
+        try {
+            if (a.length !== b.length) {
+                return false;
+            }
+
+            let result = 0;
+            for (let i = 0; i < a.length; i++) {
+                result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+            }
+
+            return result === 0;
+        } catch (error) {
+            console.error('[SecurityUtils] 时间安全比较失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 生成支付随机数（防止重放攻击）
+     * @param {number} length - 随机数长度
+     * @returns {string} 随机数字符串
+     */
+    generatePaymentNonce(length = 32) {
+        try {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let nonce = '';
+
+            // 使用Web Crypto API生成随机数
+            if (window.crypto && window.crypto.getRandomValues) {
+                const randomValues = new Uint8Array(length);
+                window.crypto.getRandomValues(randomValues);
+
+                for (let i = 0; i < length; i++) {
+                    nonce += chars[randomValues[i] % chars.length];
+                }
+            } else {
+                // 降级到Math.random
+                for (let i = 0; i < length; i++) {
+                    nonce += chars[Math.floor(Math.random() * chars.length)];
+                }
+            }
+
+            // 添加时间戳前缀
+            return Date.now().toString(36) + '_' + nonce;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付随机数生成失败:', error);
+            throw new Error('支付随机数生成失败');
+        }
+    }
+
+    /**
+     * 验证支付随机数
+     * @param {string} nonce - 随机数
+     * @param {number} maxAge - 最大有效期（毫秒）
+     * @returns {boolean} 验证结果
+     */
+    validatePaymentNonce(nonce, maxAge = 5 * 60 * 1000) { // 默认5分钟
+        try {
+            if (!nonce || typeof nonce !== 'string') {
+                return false;
+            }
+
+            // 检查格式
+            const parts = nonce.split('_');
+            if (parts.length !== 2) {
+                return false;
+            }
+
+            // 检查时间戳
+            const timestamp = parseInt(parts[0], 36);
+            if (isNaN(timestamp) || Date.now() - timestamp > maxAge) {
+                return false;
+            }
+
+            // 检查随机部分长度
+            if (parts[1].length < 16) {
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付随机数验证失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 生成支付数据校验和
+     * @param {string} data - 数据字符串
+     * @returns {string} 校验和
+     */
+    generateChecksum(data) {
+        try {
+            let hash = 0;
+            if (data.length === 0) return hash.toString();
+
+            for (let i = 0; i < data.length; i++) {
+                const char = data.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 转换为32位整数
+            }
+
+            return Math.abs(hash).toString(16);
+        } catch (error) {
+            console.error('[SecurityUtils] 校验和生成失败:', error);
+            return '0';
+        }
+    }
+
+    /**
+     * 安全存储支付信息
+     * @param {string} key - 存储键
+     * @param {Object} paymentData - 支付数据
+     * @returns {boolean} 存储结果
+     */
+    secureStorePaymentData(key, paymentData) {
+        try {
+            const secureKey = 'secure_payment_' + key;
+            const encryptedData = this.encryptPaymentData(paymentData);
+
+            localStorage.setItem(secureKey, encryptedData);
+
+            // 记录存储操作
+            this.logPaymentOperation('store', key, 'success');
+
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据安全存储失败:', error);
+            this.logPaymentOperation('store', key, 'error', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * 安全读取支付信息
+     * @param {string} key - 存储键
+     * @returns {Object|null} 支付数据
+     */
+    secureLoadPaymentData(key) {
+        try {
+            const secureKey = 'secure_payment_' + key;
+            const encryptedData = localStorage.getItem(secureKey);
+
+            if (!encryptedData) {
+                return null;
+            }
+
+            const paymentData = this.decryptPaymentData(encryptedData);
+
+            // 记录读取操作
+            this.logPaymentOperation('load', key, 'success');
+
+            return paymentData;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据安全读取失败:', error);
+            this.logPaymentOperation('load', key, 'error', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * 安全删除支付信息
+     * @param {string} key - 存储键
+     * @returns {boolean} 删除结果
+     */
+    secureRemovePaymentData(key) {
+        try {
+            const secureKey = 'secure_payment_' + key;
+            localStorage.removeItem(secureKey);
+
+            // 记录删除操作
+            this.logPaymentOperation('remove', key, 'success');
+
+            return true;
+        } catch (error) {
+            console.error('[SecurityUtils] 支付数据安全删除失败:', error);
+            this.logPaymentOperation('remove', key, 'error', error.message);
+            return false;
+        }
+    }
+
+    /**
+     * 记录支付操作日志
+     * @param {string} operation - 操作类型
+     * @param {string} key - 数据键
+     * @param {string} status - 操作状态
+     * @param {string} error - 错误信息（可选）
+     */
+    logPaymentOperation(operation, key, status, error = null) {
+        try {
+            const logEntry = {
+                operation: operation,
+                key: key,
+                status: status,
+                timestamp: new Date().toISOString(),
+                error: error
+            };
+
+            // 使用基础安全存储功能
+            this.saveSecureData('payment_security_log', logEntry);
+
+            // 限制日志条目数量
+            this.cleanupPaymentLogs(100);
+        } catch (error) {
+            console.error('[SecurityUtils] 支付操作日志记录失败:', error);
+        }
+    }
+
+    /**
+     * 清理支付安全日志
+     * @param {number} maxEntries - 最大保留条目数
+     */
+    cleanupPaymentLogs(maxEntries = 100) {
+        try {
+            const logs = this.loadSecureData('payment_security_log') || [];
+            if (Array.isArray(logs) && logs.length > maxEntries) {
+                const trimmedLogs = logs.slice(-maxEntries);
+                this.saveSecureData('payment_security_log', trimmedLogs);
+            }
+        } catch (error) {
+            console.error('[SecurityUtils] 支付日志清理失败:', error);
+        }
+    }
+
+    /**
+     * 获取支付安全统计信息
+     * @returns {Object} 安全统计信息
+     */
+    getPaymentSecurityStats() {
+        try {
+            const logs = this.loadSecureData('payment_security_log') || [];
+
+            const stats = {
+                totalOperations: logs.length,
+                successfulOperations: logs.filter(log => log.status === 'success').length,
+                failedOperations: logs.filter(log => log.status === 'error').length,
+                operationsByType: {},
+                lastActivity: logs.length > 0 ? logs[logs.length - 1].timestamp : null
+            };
+
+            // 按操作类型统计
+            logs.forEach(log => {
+                if (!stats.operationsByType[log.operation]) {
+                    stats.operationsByType[log.operation] = 0;
+                }
+                stats.operationsByType[log.operation]++;
+            });
+
+            return stats;
+        } catch (error) {
+            console.error('[SecurityUtils] 获取支付安全统计失败:', error);
+            return {
+                totalOperations: 0,
+                successfulOperations: 0,
+                failedOperations: 0,
+                operationsByType: {},
+                lastActivity: null
+            };
+        }
+    }
 }
 
 // 创建全局实例

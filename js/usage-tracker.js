@@ -36,6 +36,9 @@ class UsageTracker {
         // 初始化状态
         this.initialized = true;
 
+        // 支付管理器引用（延迟初始化）
+        this.paymentManager = null;
+
         console.log('[UsageTracker] 使用量追踪器初始化完成');
     }
 
@@ -1042,6 +1045,439 @@ class UsageTracker {
         };
 
         console.log(`[UsageTracker] 每月下载使用量已重置 (上月: ${oldCount})`);
+    }
+
+    // ================================
+    // 支付集成功能
+    // ================================
+
+    /**
+     * 初始化支付管理器引用
+     */
+    initializePaymentManager() {
+        if (window.paymentManager && !this.paymentManager) {
+            this.paymentManager = window.paymentManager;
+            console.log('[UsageTracker] 支付管理器引用已建立');
+        }
+    }
+
+    /**
+     * 获取当前套餐限制
+     * @returns {Object} 当前套餐的配额限制
+     */
+    getCurrentPlanLimits() {
+        // 确保支付管理器已初始化
+        this.initializePaymentManager();
+
+        if (this.paymentManager && typeof this.paymentManager.getCurrentPlanLimits === 'function') {
+            try {
+                const planLimits = this.paymentManager.getCurrentPlanLimits();
+                if (planLimits) {
+                    console.log('[UsageTracker] 使用支付套餐配额:', planLimits);
+                    return {
+                        dailyLimit: planLimits.dailyGenerations || this.config.dailyLimit,
+                        monthlyLimit: planLimits.monthlyGenerations || this.config.monthlyLimit,
+                        downloadDailyLimit: planLimits.dailyDownloads || this.downloadConfig.dailyLimit,
+                        downloadMonthlyLimit: planLimits.monthlyDownloads || this.downloadConfig.monthlyLimit
+                    };
+                }
+            } catch (error) {
+                console.warn('[UsageTracker] 获取支付套餐配额失败:', error.message);
+            }
+        }
+
+        // 返回默认配额
+        return {
+            dailyLimit: this.config.dailyLimit,
+            monthlyLimit: this.config.monthlyLimit,
+            downloadDailyLimit: this.downloadConfig.dailyLimit,
+            downloadMonthlyLimit: this.downloadConfig.monthlyLimit
+        };
+    }
+
+    /**
+     * 获取动态日限制
+     * @returns {number} 当前生效的日限制
+     */
+    getDynamicDailyLimit() {
+        const limits = this.getCurrentPlanLimits();
+        return limits.dailyLimit;
+    }
+
+    /**
+     * 获取动态月限制
+     * @returns {number} 当前生效的月限制
+     */
+    getDynamicMonthlyLimit() {
+        const limits = this.getCurrentPlanLimits();
+        return limits.monthlyLimit;
+    }
+
+    /**
+     * 获取动态下载日限制
+     * @returns {number} 当前生效的下载日限制
+     */
+    getDynamicDownloadDailyLimit() {
+        const limits = this.getCurrentPlanLimits();
+        return limits.downloadDailyLimit;
+    }
+
+    /**
+     * 获取动态下载月限制
+     * @returns {number} 当前生效的下载月限制
+     */
+    getDynamicDownloadMonthlyLimit() {
+        const limits = this.getCurrentPlanLimits();
+        return limits.downloadMonthlyLimit;
+    }
+
+    /**
+     * 检查动态限制
+     * @returns {boolean} 是否未达到限制
+     */
+    checkDynamicLimits() {
+        // 检查生成限制
+        if (!this.checkDynamicDailyLimit()) {
+            return false;
+        }
+
+        // 检查下载限制
+        if (!this.checkDynamicDownloadLimit()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 检查动态日限制
+     * @returns {boolean} 是否未达到日限制
+     */
+    checkDynamicDailyLimit() {
+        const dailyLimit = this.getDynamicDailyLimit();
+        return this.usageData.daily.count < dailyLimit;
+    }
+
+    /**
+     * 检查动态月限制
+     * @returns {boolean} 是否未达到月限制
+     */
+    checkDynamicMonthlyLimit() {
+        const monthlyLimit = this.getDynamicMonthlyLimit();
+        return this.usageData.monthly.count < monthlyLimit;
+    }
+
+    /**
+     * 检查动态下载限制
+     * @returns {boolean} 是否未达到下载限制
+     */
+    checkDynamicDownloadLimit() {
+        // 确保 download 数据存在
+        if (!this.usageData.download) {
+            return true;
+        }
+
+        const downloadDailyLimit = this.getDynamicDownloadDailyLimit();
+        const downloadMonthlyLimit = this.getDynamicDownloadMonthlyLimit();
+
+        // 检查每日限制
+        if (this.usageData.download.daily.count >= downloadDailyLimit) {
+            return false;
+        }
+
+        // 检查每月限制
+        if (this.usageData.download.monthly.count >= downloadMonthlyLimit) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 检查是否接近动态限制
+     * @returns {boolean} 是否接近限制
+     */
+    isNearDynamicLimit() {
+        const dailyLimit = this.getDynamicDailyLimit();
+        const downloadDailyLimit = this.getDynamicDownloadDailyLimit();
+        const threshold = this.config.warningThreshold;
+
+        const dailyUsageRatio = this.usageData.daily.count / dailyLimit;
+        const downloadDailyUsageRatio = this.usageData.download ?
+            this.usageData.download.daily.count / downloadDailyLimit : 0;
+
+        return dailyUsageRatio >= threshold || downloadDailyUsageRatio >= threshold;
+    }
+
+    /**
+     * 增强版生成追踪（集成支付感知）
+     * @param {Object} options - 生成选项
+     * @returns {boolean} 是否允许生成
+     */
+    trackGenerationEnhanced(options = {}) {
+        if (!this.config.enableUsageTracking) {
+            return true; // 如果未启用追踪，总是允许
+        }
+
+        // 初始化支付管理器
+        this.initializePaymentManager();
+
+        // 检查订阅状态
+        if (this.paymentManager && typeof this.paymentManager.isSubscriptionActive === 'function') {
+            if (!this.paymentManager.isSubscriptionActive()) {
+                this.showSubscriptionExpiredModal();
+                return false;
+            }
+        }
+
+        // 检查动态限制
+        if (!this.checkDynamicLimits()) {
+            if (!this.checkDynamicDailyLimit()) {
+                this.showDailyLimitReached();
+            } else if (!this.checkDynamicDownloadLimit()) {
+                this.showDownloadLimitReached();
+            }
+            return false;
+        }
+
+        // 检查是否接近限制
+        if (this.isNearDynamicLimit()) {
+            this.showNearDynamicLimitWarning();
+        }
+
+        // 增加使用量
+        this.usageData.daily.count++;
+        this.usageData.monthly.count++;
+
+        // 保存数据
+        this.saveUsage();
+
+        // 更新显示
+        this.updateUsageDisplay();
+
+        const dailyLimit = this.getDynamicDailyLimit();
+        console.log(`[UsageTracker] 生成已追踪，今日: ${this.usageData.daily.count}/${dailyLimit}`);
+        return true;
+    }
+
+    /**
+     * 增强版下载追踪（集成支付感知）
+     * @param {Object} options - 下载选项
+     * @returns {boolean} 是否允许下载
+     */
+    trackDownloadEnhanced(options = {}) {
+        if (!this.downloadConfig.enableDownloadTracking) {
+            return true; // 如果未启用下载追踪，总是允许
+        }
+
+        // 初始化支付管理器
+        this.initializePaymentManager();
+
+        // 检查订阅状态
+        if (this.paymentManager && typeof this.paymentManager.isSubscriptionActive === 'function') {
+            if (!this.paymentManager.isSubscriptionActive()) {
+                this.showSubscriptionExpiredModal();
+                return false;
+            }
+        }
+
+        // 确保 download 数据存在
+        if (!this.usageData.download) {
+            console.warn('[UsageTracker] Download data not initialized, initializing now');
+            const now = new Date();
+            this.usageData.download = {
+                daily: {
+                    count: 0,
+                    date: this.formatDate(now),
+                    lastReset: now.toISOString()
+                },
+                monthly: {
+                    count: 0,
+                    yearMonth: this.formatYearMonth(now),
+                    lastReset: now.toISOString()
+                },
+                history: []
+            };
+        }
+
+        // 检查动态下载限制
+        if (!this.checkDynamicDownloadLimit()) {
+            this.showDownloadLimitReached();
+            return false;
+        }
+
+        // 检查是否接近下载限制
+        if (this.isNearDynamicLimit()) {
+            this.showNearDynamicLimitWarning();
+        }
+
+        // 增加下载量
+        this.usageData.download.daily.count++;
+        this.usageData.download.monthly.count++;
+
+        // 保存数据
+        this.saveUsage();
+
+        // 更新显示
+        this.updateUsageDisplay();
+
+        const downloadDailyLimit = this.getDynamicDownloadDailyLimit();
+        console.log(`[UsageTracker] 下载已追踪，今日: ${this.usageData.download.daily.count}/${downloadDailyLimit}`);
+        return true;
+    }
+
+    /**
+     * 显示订阅过期模态框
+     */
+    showSubscriptionExpiredModal() {
+        // 初始化支付管理器
+        this.initializePaymentManager();
+
+        if (this.paymentManager && typeof this.paymentManager.showPaymentModal === 'function') {
+            this.paymentManager.showPaymentModal('expired');
+        } else {
+            // 降级处理
+            const message = '您的订阅已过期，请升级套餐以继续使用';
+            this.showTemporaryNotification(message, 'warning');
+        }
+    }
+
+    /**
+     * 显示接近动态限制警告
+     */
+    showNearDynamicLimitWarning() {
+        const dailyLimit = this.getDynamicDailyLimit();
+        const downloadDailyLimit = this.getDynamicDownloadDailyLimit();
+        const dailyRemaining = dailyLimit - this.usageData.daily.count;
+        const downloadDailyRemaining = downloadDailyLimit - (this.usageData.download?.daily.count || 0);
+
+        let message = `使用量即将达到上限，`;
+        if (dailyRemaining <= 5) {
+            message += `今日剩余生成仅 ${dailyRemaining} 次。`;
+        } else if (downloadDailyRemaining <= 5) {
+            message += `今日剩余下载仅 ${downloadDailyRemaining} 次。`;
+        } else {
+            message += `请合理使用功能。`;
+        }
+
+        // 使用全局应用的通知系统
+        if (window.app && window.app.showNotification) {
+            window.app.showNotification(message, 'warning');
+        } else {
+            // 降级处理
+            console.warn(`[UsageTracker] ${message}`);
+            this.showTemporaryNotification(message, 'warning');
+        }
+    }
+
+    /**
+     * 获取增强版使用量信息
+     * @returns {Object} 使用量信息
+     */
+    getEnhancedUsage() {
+        const limits = this.getCurrentPlanLimits();
+
+        return {
+            daily: {
+                count: this.usageData.daily.count,
+                limit: limits.dailyLimit,
+                remaining: Math.max(0, limits.dailyLimit - this.usageData.daily.count),
+                percentage: Math.min(100, (this.usageData.daily.count / limits.dailyLimit) * 100)
+            },
+            monthly: {
+                count: this.usageData.monthly.count,
+                limit: limits.monthlyLimit,
+                remaining: Math.max(0, limits.monthlyLimit - this.usageData.monthly.count),
+                percentage: Math.min(100, (this.usageData.monthly.count / limits.monthlyLimit) * 100)
+            },
+            download: this.getDownloadUsage(),
+            history: this.usageData.history,
+            isTrackingEnabled: this.config.enableUsageTracking,
+            currentPlan: this.paymentManager ? this.paymentManager.getCurrentSubscription()?.currentPlan : 'free',
+            isNearLimit: this.isNearDynamicLimit(),
+            isLimitReached: !this.checkDynamicLimits()
+        };
+    }
+
+    /**
+     * 重写原有的更新显示方法，使用动态配额
+     */
+    updateUsageDisplayEnhanced() {
+        const usage = this.getEnhancedUsage();
+        const downloadUsage = this.getDownloadUsage();
+
+        // 检查是否有document对象（浏览器环境）
+        if (typeof document === 'undefined' || !document.getElementById) {
+            // 非浏览器环境，只触发事件
+            this.triggerUsageUpdatedEvent({ usage, downloadUsage });
+            return;
+        }
+
+        // 查找使用量显示元素
+        const usageElement = document.getElementById('usage-display');
+        if (usageElement) {
+            // 计算进度条样式类
+            let generationProgressClass = 'normal';
+            if (usage.daily.percentage >= 100) {
+                generationProgressClass = 'error';
+            } else if (usage.daily.percentage >= this.config.warningThreshold * 100) {
+                generationProgressClass = 'warning';
+            }
+
+            let downloadProgressClass = 'normal';
+            if (downloadUsage.daily.percentage >= 100) {
+                downloadProgressClass = 'error';
+            } else if (downloadUsage.daily.percentage >= this.downloadConfig.warningThreshold * 100) {
+                downloadProgressClass = 'warning';
+            }
+
+            // 添加当前套餐信息
+            const currentPlanName = this.paymentManager ?
+                this.paymentManager.plans[usage.currentPlan]?.name || '免费版' : '免费版';
+
+            usageElement.innerHTML = `
+                <div class="usage-info">
+                    <div class="usage-section">
+                        <span class="current-plan-label">当前套餐: ${currentPlanName}</span>
+                        <span class="usage-daily">生成: ${usage.daily.count}/${usage.daily.limit}</span>
+                        <span class="usage-monthly">本月: ${usage.monthly.count}/${usage.monthly.limit}</span>
+                    </div>
+                    <div class="usage-section">
+                        <span class="download-daily">下载: ${downloadUsage.daily.count}/${downloadUsage.daily.limit}</span>
+                        <span class="download-monthly">本月: ${downloadUsage.monthly.count}/${downloadUsage.monthly.limit}</span>
+                    </div>
+                </div>
+                <div class="usage-progress-container">
+                    <div class="usage-progress-bar generation ${generationProgressClass}"
+                         style="width: ${usage.daily.percentage}%"
+                         title="生成进度: ${usage.daily.count}/${usage.daily.limit}"></div>
+                    <div class="usage-progress-bar download ${downloadProgressClass}"
+                         style="width: ${downloadUsage.daily.percentage}%"
+                         title="下载进度: ${downloadUsage.daily.count}/${downloadUsage.daily.limit}"></div>
+                </div>
+            `;
+
+            // 添加生成警告样式
+            if (usage.daily.percentage >= 100) {
+                usageElement.classList.add('usage-limit-reached');
+            } else if (usage.daily.percentage >= this.config.warningThreshold * 100) {
+                usageElement.classList.add('usage-near-limit');
+            } else {
+                usageElement.classList.remove('usage-near-limit', 'usage-limit-reached');
+            }
+
+            // 添加下载警告样式
+            if (downloadUsage.daily.percentage >= 100) {
+                usageElement.classList.add('download-limit-reached');
+            } else if (downloadUsage.daily.percentage >= this.downloadConfig.warningThreshold * 100) {
+                usageElement.classList.add('download-near-limit');
+            } else {
+                usageElement.classList.remove('download-near-limit', 'download-limit-reached');
+            }
+        }
+
+        // 触发自定义事件
+        this.triggerUsageUpdatedEvent({ usage, downloadUsage });
     }
 }
 

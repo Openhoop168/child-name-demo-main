@@ -20,6 +20,11 @@ class StorageManager {
             LAST_USED_THEME: 'last_used_theme',
             USAGE_STATS: 'usage_stats',
 
+            // 支付相关
+            USER_SUBSCRIPTION: 'user_subscription',
+            PAYMENT_ORDERS: 'payment_orders',
+            PAYMENT_SETTINGS: 'payment_settings',
+
             // 缓存
             VOCABULARY_CACHE: 'vocabulary_cache',
             PROMPT_CACHE: 'prompt_cache'
@@ -612,6 +617,306 @@ class StorageManager {
         } catch (error) {
             console.error('清空所有数据失败:', error);
             return false;
+        }
+    }
+
+    // ================================
+    // 支付相关存储方法
+    // ================================
+
+    /**
+     * 保存用户订阅信息
+     * @param {Object} subscription - 订阅信息
+     * @returns {boolean} 是否保存成功
+     */
+    async saveUserSubscription(subscription) {
+        try {
+            const data = {
+                ...subscription,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (window.securityUtils) {
+                await window.securityUtils.saveSecureData(this.keys.USER_SUBSCRIPTION, data);
+            } else {
+                localStorage.setItem(this.keys.USER_SUBSCRIPTION, JSON.stringify(data));
+            }
+
+            console.log('[StorageManager] 用户订阅信息已保存:', subscription.currentPlan);
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 保存用户订阅失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 获取用户订阅信息
+     * @returns {Object|null} 订阅信息
+     */
+    async getUserSubscription() {
+        try {
+            let data;
+
+            if (window.securityUtils) {
+                data = await window.securityUtils.loadSecureData(this.keys.USER_SUBSCRIPTION);
+            } else {
+                const stored = localStorage.getItem(this.keys.USER_SUBSCRIPTION);
+                data = stored ? JSON.parse(stored) : null;
+            }
+
+            return data;
+        } catch (error) {
+            console.error('[StorageManager] 获取用户订阅失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 删除用户订阅信息
+     * @returns {boolean} 是否删除成功
+     */
+    async removeUserSubscription() {
+        try {
+            if (window.securityUtils) {
+                await window.securityUtils.removeSecureData(this.keys.USER_SUBSCRIPTION);
+            } else {
+                localStorage.removeItem(this.keys.USER_SUBSCRIPTION);
+            }
+
+            console.log('[StorageManager] 用户订阅信息已删除');
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 删除用户订阅失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 保存支付订单
+     * @param {Object} order - 订单信息
+     * @returns {boolean} 是否保存成功
+     */
+    async savePaymentOrder(order) {
+        try {
+            const orders = await this.getPaymentOrders();
+
+            // 检查是否已存在相同订单ID的订单
+            const existingIndex = orders.findIndex(o => o.orderId === order.orderId);
+            if (existingIndex >= 0) {
+                // 更新现有订单
+                orders[existingIndex] = { ...orders[existingIndex], ...order };
+            } else {
+                // 添加新订单到开头
+                orders.unshift(order);
+            }
+
+            // 限制订单记录数量
+            if (orders.length > 100) {
+                orders.splice(100);
+            }
+
+            const data = {
+                orders: orders,
+                updatedAt: new Date().toISOString(),
+                total: orders.length
+            };
+
+            if (window.securityUtils) {
+                await window.securityUtils.saveSecureData(this.keys.PAYMENT_ORDERS, data);
+            } else {
+                localStorage.setItem(this.keys.PAYMENT_ORDERS, JSON.stringify(data));
+            }
+
+            console.log('[StorageManager] 支付订单已保存:', order.orderId);
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 保存支付订单失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 获取支付订单列表
+     * @param {number} limit - 限制数量
+     * @returns {Array} 订单列表
+     */
+    async getPaymentOrders(limit = null) {
+        try {
+            let data;
+
+            if (window.securityUtils) {
+                data = await window.securityUtils.loadSecureData(this.keys.PAYMENT_ORDERS);
+            } else {
+                const stored = localStorage.getItem(this.keys.PAYMENT_ORDERS);
+                data = stored ? JSON.parse(stored) : null;
+            }
+
+            const orders = data ? data.orders : [];
+
+            if (limit && limit > 0) {
+                return orders.slice(0, limit);
+            }
+
+            return orders;
+        } catch (error) {
+            console.error('[StorageManager] 获取支付订单失败:', error);
+            return [];
+        }
+    }
+
+    /**
+     * 获取单个支付订单
+     * @param {string} orderId - 订单ID
+     * @returns {Object|null} 订单信息
+     */
+    async getPaymentOrder(orderId) {
+        try {
+            const orders = await this.getPaymentOrders();
+            return orders.find(order => order.orderId === orderId) || null;
+        } catch (error) {
+            console.error('[StorageManager] 获取单个支付订单失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 删除支付订单
+     * @param {string} orderId - 订单ID
+     * @returns {boolean} 是否删除成功
+     */
+    async removePaymentOrder(orderId) {
+        try {
+            const orders = await this.getPaymentOrders();
+            const filteredOrders = orders.filter(order => order.orderId !== orderId);
+
+            const data = {
+                orders: filteredOrders,
+                updatedAt: new Date().toISOString(),
+                total: filteredOrders.length
+            };
+
+            if (window.securityUtils) {
+                await window.securityUtils.saveSecureData(this.keys.PAYMENT_ORDERS, data);
+            } else {
+                localStorage.setItem(this.keys.PAYMENT_ORDERS, JSON.stringify(data));
+            }
+
+            console.log('[StorageManager] 支付订单已删除:', orderId);
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 删除支付订单失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 清空支付订单
+     * @returns {boolean} 是否清空成功
+     */
+    async clearPaymentOrders() {
+        try {
+            if (window.securityUtils) {
+                await window.securityUtils.removeSecureData(this.keys.PAYMENT_ORDERS);
+            } else {
+                localStorage.removeItem(this.keys.PAYMENT_ORDERS);
+            }
+
+            console.log('[StorageManager] 支付订单已清空');
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 清空支付订单失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 保存支付设置
+     * @param {Object} settings - 支付设置
+     * @returns {boolean} 是否保存成功
+     */
+    async savePaymentSettings(settings) {
+        try {
+            const data = {
+                ...settings,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (window.securityUtils) {
+                await window.securityUtils.saveSecureData(this.keys.PAYMENT_SETTINGS, data);
+            } else {
+                localStorage.setItem(this.keys.PAYMENT_SETTINGS, JSON.stringify(data));
+            }
+
+            console.log('[StorageManager] 支付设置已保存');
+            return true;
+        } catch (error) {
+            console.error('[StorageManager] 保存支付设置失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 获取支付设置
+     * @returns {Object|null} 支付设置
+     */
+    async getPaymentSettings() {
+        try {
+            let data;
+
+            if (window.securityUtils) {
+                data = await window.securityUtils.loadSecureData(this.keys.PAYMENT_SETTINGS);
+            } else {
+                const stored = localStorage.getItem(this.keys.PAYMENT_SETTINGS);
+                data = stored ? JSON.parse(stored) : null;
+            }
+
+            return data;
+        } catch (error) {
+            console.error('[StorageManager] 获取支付设置失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 获取支付统计信息
+     * @returns {Object} 支付统计
+     */
+    async getPaymentStats() {
+        try {
+            const orders = await this.getPaymentOrders();
+            const subscription = await this.getUserSubscription();
+
+            const stats = {
+                totalOrders: orders.length,
+                paidOrders: orders.filter(order => order.status === 'paid').length,
+                pendingOrders: orders.filter(order => order.status === 'pending').length,
+                failedOrders: orders.filter(order => order.status === 'failed').length,
+                totalSpent: orders
+                    .filter(order => order.status === 'paid')
+                    .reduce((sum, order) => sum + (order.amount || 0), 0),
+                currentPlan: subscription ? subscription.currentPlan : 'free',
+                planStatus: subscription ? subscription.planStatus : 'active',
+                lastPaymentDate: orders.length > 0 ? orders[0].createdAt : null,
+                subscriptionStartDate: subscription ? subscription.startDate : null,
+                subscriptionEndDate: subscription ? subscription.endDate : null
+            };
+
+            return stats;
+        } catch (error) {
+            console.error('[StorageManager] 获取支付统计失败:', error);
+            return {
+                totalOrders: 0,
+                paidOrders: 0,
+                pendingOrders: 0,
+                failedOrders: 0,
+                totalSpent: 0,
+                currentPlan: 'free',
+                planStatus: 'active',
+                lastPaymentDate: null,
+                subscriptionStartDate: null,
+                subscriptionEndDate: null
+            };
         }
     }
 

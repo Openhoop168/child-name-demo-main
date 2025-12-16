@@ -85,6 +85,157 @@ window.APP_CONFIG = {
     },
 
     // ================================
+    // 支付系统配置
+    // ================================
+    payment: {
+        enabled: "{{ENABLE_PAYMENT}}" !== "false",
+        provider: "{{PAYMENT_PROVIDER}}" || "alipay", // alipay | wechat | both
+        sandbox: "{{PAYMENT_SANDBOX}}" === "true",
+        returnUrl: "{{PAYMENT_RETURN_URL}}" || window.location.origin + "/payment/return",
+        notifyUrl: "{{PAYMENT_NOTIFY_URL}}" || window.location.origin + "/api/payment/notify",
+        currency: "CNY",
+        maxOrderAge: 3600000, // 1小时（毫秒）
+        nonceExpireTime: 300000, // 5分钟（毫秒）
+
+        // 套餐配置
+        plans: {
+            free: {
+                id: 'free',
+                name: '免费版',
+                price: 0,
+                duration: 'permanent',
+                productId: 'free_lifetime'
+            },
+            basic_monthly: {
+                id: 'basic_monthly',
+                name: '基础版',
+                price: 9.9,
+                duration: 'monthly',
+                productId: 'basic_monthly_v1'
+            },
+            pro_monthly: {
+                id: 'pro_monthly',
+                name: '专业版',
+                price: 29.9,
+                duration: 'monthly',
+                productId: 'pro_monthly_v1'
+            },
+            premium_monthly: {
+                id: 'premium_monthly',
+                name: '高级版',
+                price: 59.9,
+                duration: 'monthly',
+                productId: 'premium_monthly_v1'
+            }
+        },
+
+        // 支付提供商配置
+        providers: {
+            alipay: {
+                enabled: true,
+                appId: "{{ALIPAY_APP_ID}}",
+                gateway: "{{ALIPAY_GATEWAY}}" || "https://openapi.alipay.com/gateway.do",
+                publicKey: "{{ALIPAY_PUBLIC_KEY}}",
+                privateKey: "{{ALIPAY_PRIVATE_KEY}}",
+                signType: "RSA2",
+                charset: "utf-8",
+                version: "1.0"
+            },
+            wechat: {
+                enabled: "{{WECHAT_PAY_ENABLED}}" === "true",
+                appId: "{{WECHAT_APP_ID}}",
+                mchId: "{{WECHAT_MCH_ID}}",
+                apiKey: "{{WECHAT_API_KEY}}",
+                notifyUrl: "{{WECHAT_NOTIFY_URL}}",
+                tradeType: "MWEB"
+            }
+        },
+
+        // 安全配置
+        security: {
+            enableEncryption: "{{PAYMENT_ENABLE_ENCRYPTION}}" !== "false",
+            enableSignature: "{{PAYMENT_ENABLE_SIGNATURE}}" !== "false",
+            enableNonceCheck: "{{PAYMENT_ENABLE_NONCE_CHECK}}" !== "false",
+            enableAmountValidation: "{{PAYMENT_ENABLE_AMOUNT_VALIDATION}}" !== "false",
+            maxRetryAttempts: 3,
+            cooldownPeriod: 60000 // 1分钟
+        }
+    },
+
+    // ================================
+    // 用户会员系统
+    // ================================
+    membership: {
+        enabled: "{{ENABLE_MEMBERSHIP}}" !== "false",
+        defaultPlan: "free",
+        upgradeGracePeriod: 7, // 升级宽限期（天）
+        autoRenewal: false,
+        trialPeriod: 0, // 免费试用天数
+        subscriptionReminder: true,
+        expiryWarningDays: 3, // 到期前多少天开始提醒
+
+        // 套餐功能映射
+        planFeatures: {
+            free: {
+                dailyGenerations: 100,
+                monthlyGenerations: 3000,
+                dailyDownloads: 50,
+                monthlyDownloads: 1000,
+                vocabularyCount: { core: 4, common: 6, environment: 4 },
+                themes: ["超市", "医院", "公园", "学校", "家庭", "动物园"],
+                supportLevel: 'basic',
+                customVocabulary: false,
+                batchGeneration: false,
+                customStyles: false,
+                apiAccess: false,
+                commercialLicense: false
+            },
+            basic_monthly: {
+                dailyGenerations: 500,
+                monthlyGenerations: 15000,
+                dailyDownloads: 250,
+                monthlyDownloads: 5000,
+                vocabularyCount: { core: 8, common: 12, environment: 8 },
+                themes: "all",
+                supportLevel: 'standard',
+                customVocabulary: true,
+                batchGeneration: false,
+                customStyles: false,
+                apiAccess: false,
+                commercialLicense: false
+            },
+            pro_monthly: {
+                dailyGenerations: 2000,
+                monthlyGenerations: 60000,
+                dailyDownloads: 1000,
+                monthlyDownloads: 20000,
+                vocabularyCount: { core: 15, common: 20, environment: 15 },
+                themes: "all",
+                supportLevel: 'priority',
+                customVocabulary: true,
+                batchGeneration: true,
+                customStyles: true,
+                apiAccess: false,
+                commercialLicense: false
+            },
+            premium_monthly: {
+                dailyGenerations: 10000,
+                monthlyGenerations: 300000,
+                dailyDownloads: 5000,
+                monthlyDownloads: 100000,
+                vocabularyCount: { core: 30, common: 40, environment: 30 },
+                themes: "all",
+                supportLevel: 'vip',
+                customVocabulary: true,
+                batchGeneration: true,
+                customStyles: true,
+                apiAccess: true,
+                commercialLicense: true
+            }
+        }
+    },
+
+    // ================================
     // 内置配置
     // ================================
     builtIn: {
@@ -244,7 +395,17 @@ window.APP_CONFIG = {
             monthlyLimitExceeded: "本月使用次数已达上限，请下月再试",
             dailyDownloadLimitExceeded: "今日下载次数已达上限，请明天再试",
             monthlyDownloadLimitExceeded: "本月下载次数已达上限，请下月再试",
-            downloadLimitExceeded: "下载次数已达上限，请升级套餐或明天再试"
+            downloadLimitExceeded: "下载次数已达上限，请升级套餐或明天再试",
+            paymentError: "支付处理失败，请稍后重试",
+            paymentCancelled: "支付已取消",
+            paymentExpired: "支付已超时，请重新发起",
+            insufficientBalance: "账户余额不足",
+            paymentInvalidAmount: "支付金额无效",
+            paymentInvalidSignature: "支付签名验证失败",
+            paymentDuplicateOrder: "重复的订单请求",
+            paymentSystemError: "支付系统错误",
+            subscriptionExpired: "订阅已过期，请重新购买",
+            paymentVerificationFailed: "支付验证失败，请联系客服"
         },
         success: {
             configLoaded: "配置加载成功",
@@ -252,7 +413,13 @@ window.APP_CONFIG = {
             imageGenerated: "图片生成成功",
             imageDownloaded: "图片下载成功",
             usageReset: "使用量统计已重置",
-            downloadUsageReset: "下载使用量统计已重置"
+            downloadUsageReset: "下载使用量统计已重置",
+            paymentSuccess: "支付成功",
+            subscriptionUpgraded: "套餐升级成功",
+            subscriptionDowngraded: "套餐切换成功",
+            subscriptionCancelled: "订阅已取消",
+            subscriptionRenewed: "订阅已续费",
+            paymentOrderCreated: "订单创建成功"
         },
         warnings: {
             apiKeyDeprecated: "API密钥可能已过期，请检查",
@@ -263,7 +430,12 @@ window.APP_CONFIG = {
             usageTrackingDisabled: "使用量追踪功能已关闭",
             dailyDownloadLimitWarning: "今日下载次数即将达到上限",
             monthlyDownloadLimitWarning: "本月下载次数即将达到上限",
-            downloadTrackingDisabled: "下载使用量追踪功能已关闭"
+            downloadTrackingDisabled: "下载使用量追踪功能已关闭",
+            subscriptionExpiringSoon: "订阅即将到期，请及时续费",
+            paymentPending: "支付正在处理中，请稍候",
+            subscriptionGracePeriod: "订阅已过期，正在宽限期内",
+            upgradeSuggestion: "使用量即将达到上限，建议升级套餐",
+            paymentSecurityWarning: "支付安全检测到异常，请谨慎操作"
         }
     },
 
