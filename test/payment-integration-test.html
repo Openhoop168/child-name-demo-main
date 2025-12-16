@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支付功能集成测试 - 儿童识字小报生成器</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #45B7D1;
+        }
+
+        .test-form {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group label {
+            min-width: 120px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #45B7D1;
+            box-shadow: 0 0 0 2px rgba(69, 183, 209, 0.2);
+        }
+
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: #45B7D1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3498db;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .result-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #45B7D1;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-panel.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .result-panel.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .result-panel.warning {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.idle {
+            background: #6c757d;
+        }
+
+        .status-indicator.running {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+
+        .status-indicator.success {
+            background: #28a745;
+        }
+
+        .status-indicator.error {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .test-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #45B7D1;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #45B7D1;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>支付功能集成测试</h1>
+        <p>此页面用于测试支付功能的各个组件，包括支付API、支付管理器和支付结果页面。</p>
+
+        <!-- 支付API测试 -->
+        <div class="test-section">
+            <h2><span class="status-indicator" id="apiStatus"></span>支付API测试</h2>
+
+            <div class="test-form">
+                <div class="form-group">
+                    <label>支付方式：</label>
+                    <select id="paymentMethod">
+                        <option value="alipay">支付宝</option>
+                        <option value="wechat">微信支付</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>套餐ID：</label>
+                    <select id="planId">
+                        <option value="basic_monthly">基础版 - ¥9.9</option>
+                        <option value="pro_monthly">专业版 - ¥29.9</option>
+                        <option value="premium_monthly">高级版 - ¥59.9</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>订单号：</label>
+                    <input type="text" id="orderId" placeholder="留空自动生成">
+                </div>
+                <div class="form-group">
+                    <label>金额：</label>
+                    <input type="number" id="amount" step="0.01" value="9.9">
+                </div>
+            </div>
+
+            <div class="test-buttons">
+                <button class="btn btn-primary" onclick="testCreateOrder()">
+                    创建订单
+                </button>
+                <button class="btn btn-secondary" onclick="testQueryStatus()">
+                    查询状态
+                </button>
+                <button class="btn btn-success" onclick="testSimulateSuccess()">
+                    模拟成功
+                </button>
+                <button class="btn btn-danger" onclick="testSimulateFailure()">
+                    模拟失败
+                </button>
+                <button class="btn btn-secondary" onclick="clearApiResult()">
+                    清空结果
+                </button>
+            </div>
+
+            <div id="apiResult" class="result-panel" style="display: none;"></div>
+        </div>
+
+        <!-- 支付管理器测试 -->
+        <div class="test-section">
+            <h2><span class="status-indicator" id="managerStatus"></span>支付管理器测试</h2>
+
+            <div class="test-form">
+                <div class="form-group">
+                    <label>测试场景：</label>
+                    <select id="testScenario">
+                        <option value="complete">完整支付流程</option>
+                        <option value="upgrade">套餐升级</option>
+                        <option value="failure">支付失败</option>
+                        <option value="timeout">支付超时</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="test-buttons">
+                <button class="btn btn-primary" onclick="testPaymentManager()">
+                    开始测试
+                </button>
+                <button class="btn btn-secondary" onclick="testPaymentFlow()">
+                    测试支付流程
+                </button>
+                <button class="btn btn-secondary" onclick="clearManagerResult()">
+                    清空结果
+                </button>
+            </div>
+
+            <div id="managerResult" class="result-panel" style="display: none;"></div>
+        </div>
+
+        <!-- 异常场景测试 -->
+        <div class="test-section">
+            <h2>异常场景测试</h2>
+
+            <div class="test-buttons">
+                <button class="btn btn-danger" onclick="testNetworkError()">
+                    网络错误
+                </button>
+                <button class="btn btn-danger" onclick="testInvalidOrder()">
+                    无效订单
+                </button>
+                <button class="btn btn-danger" onclick="testAmountMismatch()">
+                    金额不匹配
+                </button>
+                <button class="btn btn-danger" onclick="testDuplicatePayment()">
+                    重复支付
+                </button>
+                <button class="btn btn-danger" onclick="testPaymentCooldown()">
+                    支付冷却
+                </button>
+            </div>
+
+            <div id="errorResult" class="result-panel" style="display: none;"></div>
+        </div>
+
+        <!-- 测试统计 -->
+        <div class="test-section">
+            <h2>测试统计</h2>
+
+            <div class="test-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTests">0</div>
+                    <div class="stat-label">总测试数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="passedTests">0</div>
+                    <div class="stat-label">通过测试</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="failedTests">0</div>
+                    <div class="stat-label">失败测试</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="successRate">0%</div>
+                    <div class="stat-label">成功率</div>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入必要的脚本 -->
+    <script src="../js/config.js"></script>
+    <script src="../js/storage-manager.js"></script>
+    <script src="../js/security-utils.js"></script>
+    <script src="../js/payment-api.js"></script>
+    <script src="../js/payment-manager.js"></script>
+
+    <script>
+        /**
+         * 支付功能集成测试类
+         */
+        class PaymentIntegrationTest {
+            constructor() {
+                this.paymentApi = new PaymentAPI();
+                this.testStats = {
+                    total: 0,
+                    passed: 0,
+                    failed: 0
+                };
+                this.currentOrderId = null;
+                this.init();
+            }
+
+            init() {
+                console.log('[PaymentIntegrationTest] 初始化测试环境');
+                this.updateStats();
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // 监听支付管理器事件
+                window.addEventListener('paymentSuccess', (event) => {
+                    this.log('manager', 'success', '收到支付成功事件', event.detail);
+                });
+
+                window.addEventListener('paymentFailed', (event) => {
+                    this.log('manager', 'error', '收到支付失败事件', event.detail);
+                });
+
+                window.addEventListener('paymentExpired', (event) => {
+                    this.log('manager', 'warning', '收到支付过期事件', event.detail);
+                });
+            }
+
+            /**
+             * 测试创建订单
+             */
+            async testCreateOrder() {
+                this.setStatus('api', 'running');
+                this.log('api', 'info', '开始创建订单测试');
+
+                try {
+                    const paymentMethod = document.getElementById('paymentMethod').value;
+                    const planId = document.getElementById('planId').value;
+                    const orderId = document.getElementById('orderId').value || this.generateOrderId();
+                    const amount = parseFloat(document.getElementById('amount').value);
+
+                    this.currentOrderId = orderId;
+
+                    const orderData = {
+                        orderId: orderId,
+                        planId: planId,
+                        amount: amount,
+                        subject: `测试订单 - ${planId}`,
+                        body: '支付功能集成测试'
+                    };
+
+                    let result;
+                    if (paymentMethod === 'alipay') {
+                        result = await this.paymentApi.createAlipayOrder(orderData);
+                    } else {
+                        result = await this.paymentApi.createWechatOrder(orderData);
+                    }
+
+                    if (result.success) {
+                        this.log('api', 'success', '订单创建成功', result);
+                        this.testStats.passed++;
+                    } else {
+                        this.log('api', 'error', '订单创建失败', result);
+                        this.testStats.failed++;
+                    }
+
+                    this.testStats.total++;
+                    this.updateStats();
+
+                } catch (error) {
+                    this.log('api', 'error', '订单创建异常', error.message);
+                    this.testStats.total++;
+                    this.testStats.failed++;
+                    this.updateStats();
+                } finally {
+                    this.setStatus('api', 'success');
+                }
+            }
+
+            /**
+             * 测试查询状态
+             */
+            async testQueryStatus() {
+                if (!this.currentOrderId) {
+                    this.log('api', 'warning', '请先创建订单');
+                    return;
+                }
+
+                this.setStatus('api', 'running');
+                this.log('api', 'info', '开始查询订单状态');
+
+                try {
+                    const result = await this.paymentApi.queryPaymentStatus(
+                        this.currentOrderId,
+                        document.getElementById('paymentMethod').value
+                    );
+
+                    if (result.success) {
+                        this.log('api', 'success', '状态查询成功', result);
+                        this.testStats.passed++;
+                    } else {
+                        this.log('api', 'error', '状态查询失败', result);
+                        this.testStats.failed++;
+                    }
+
+                    this.testStats.total++;
+                    this.updateStats();
+
+                } catch (error) {
+                    this.log('api', 'error', '状态查询异常', error.message);
+                    this.testStats.total++;
+                    this.testStats.failed++;
+                    this.updateStats();
+                } finally {
+                    this.setStatus('api', 'success');
+                }
+            }
+
+            /**
+             * 模拟支付成功
+             */
+            async testSimulateSuccess() {
+                if (!this.currentOrderId) {
+                    this.log('api', 'warning', '请先创建订单');
+                    return;
+                }
+
+                this.log('api', 'info', '模拟支付成功');
+
+                // 手动更新订单状态为已支付
+                const order = this.paymentApi.getMockOrder(this.currentOrderId);
+                if (order) {
+                    order.status = 'paid';
+                    order.paidAt = new Date().toISOString();
+                    order.tradeNo = 'TEST' + Date.now();
+                    this.paymentApi.saveMockOrder(order);
+                    this.log('api', 'success', '已模拟支付成功', order);
+                }
+            }
+
+            /**
+             * 模拟支付失败
+             */
+            async testSimulateFailure() {
+                if (!this.currentOrderId) {
+                    this.log('api', 'warning', '请先创建订单');
+                    return;
+                }
+
+                this.log('api', 'info', '模拟支付失败');
+
+                // 手动更新订单状态为失败
+                const order = this.paymentApi.getMockOrder(this.currentOrderId);
+                if (order) {
+                    order.status = 'failed';
+                    order.errorMessage = '模拟支付失败';
+                    this.paymentApi.saveMockOrder(order);
+                    this.log('api', 'success', '已模拟支付失败', order);
+                }
+            }
+
+            /**
+             * 测试支付管理器
+             */
+            async testPaymentManager() {
+                this.setStatus('manager', 'running');
+                this.log('manager', 'info', '开始测试支付管理器');
+
+                try {
+                    const scenario = document.getElementById('testScenario').value;
+                    const planId = document.getElementById('planId').value;
+                    const orderId = this.generateOrderId();
+
+                    // 创建测试订单
+                    const order = await window.paymentManager.createOrder(planId, 'alipay');
+
+                    this.log('manager', 'success', '订单创建成功', order);
+
+                    // 根据场景执行不同测试
+                    switch (scenario) {
+                        case 'complete':
+                            await this.testCompletePayment(order);
+                            break;
+                        case 'upgrade':
+                            await this.testUpgradeFlow(order);
+                            break;
+                        case 'failure':
+                            await this.testFailureFlow(order);
+                            break;
+                        case 'timeout':
+                            await this.testTimeoutFlow(order);
+                            break;
+                    }
+
+                    this.testStats.passed++;
+                    this.testStats.total++;
+                    this.updateStats();
+
+                } catch (error) {
+                    this.log('manager', 'error', '支付管理器测试失败', error.message);
+                    this.testStats.total++;
+                    this.testStats.failed++;
+                    this.updateStats();
+                } finally {
+                    this.setStatus('manager', 'success');
+                }
+            }
+
+            /**
+             * 测试完整支付流程
+             */
+            async testCompletePayment(order) {
+                this.log('manager', 'info', '测试完整支付流程');
+
+                // 发起支付
+                const result = await window.paymentManager.initiatePayment(order);
+                this.log('manager', 'success', '支付发起成功', result);
+
+                // 模拟支付成功
+                await this.testSimulateSuccess();
+
+                // 等待状态更新
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // 检查订单状态
+                const status = await window.paymentManager.checkPaymentStatus(order.orderId);
+                this.log('manager', 'success', '支付状态检查', status);
+            }
+
+            /**
+             * 测试升级流程
+             */
+            async testUpgradeFlow(order) {
+                this.log('manager', 'info', '测试套餐升级流程');
+
+                // 检查当前订阅
+                const currentPlan = window.paymentManager.getCurrentSubscription();
+                this.log('manager', 'info', '当前订阅', currentPlan);
+
+                // 发起升级
+                const result = await window.paymentManager.initiatePayment(order);
+                this.log('manager', 'success', '升级发起成功', result);
+            }
+
+            /**
+             * 测试失败流程
+             */
+            async testFailureFlow(order) {
+                this.log('manager', 'info', '测试支付失败流程');
+
+                // 模拟支付失败
+                await this.testSimulateFailure();
+
+                // 检查失败处理
+                const status = await window.paymentManager.checkPaymentStatus(order.orderId);
+                this.log('manager', 'warning', '支付失败状态', status);
+            }
+
+            /**
+             * 测试超时流程
+             */
+            async testTimeoutFlow(order) {
+                this.log('manager', 'info', '测试支付超时流程');
+
+                // 设置过期时间为过去
+                order.expireTime = new Date(Date.now() - 1000).toISOString();
+                await window.paymentManager.saveOrder(order);
+
+                // 检查过期处理
+                const status = await window.paymentManager.checkPaymentStatus(order.orderId);
+                this.log('manager', 'warning', '支付过期状态', status);
+            }
+
+            /**
+             * 测试网络错误
+             */
+            async testNetworkError() {
+                this.log('error', 'info', '测试网络错误处理');
+
+                // 临时修改API方法以模拟网络错误
+                const originalMethod = this.paymentApi.createAlipayOrder;
+                this.paymentApi.createAlipayOrder = () => {
+                    throw new Error('网络连接失败');
+                };
+
+                try {
+                    await this.testCreateOrder();
+                } finally {
+                    // 恢复原方法
+                    this.paymentApi.createAlipayOrder = originalMethod;
+                }
+
+                this.log('error', 'success', '网络错误测试完成');
+            }
+
+            /**
+             * 测试无效订单
+             */
+            async testInvalidOrder() {
+                this.log('error', 'info', '测试无效订单处理');
+
+                try {
+                    const invalidOrder = {
+                        orderId: '', // 空订单号
+                        planId: 'invalid_plan', // 无效套餐
+                        amount: -100 // 负金额
+                    };
+
+                    await window.paymentManager.initiatePayment(invalidOrder);
+                } catch (error) {
+                    this.log('error', 'success', '成功捕获无效订单错误', error.message);
+                }
+            }
+
+            /**
+             * 测试金额不匹配
+             */
+            async testAmountMismatch() {
+                this.log('error', 'info', '测试金额不匹配处理');
+
+                try {
+                    const planId = document.getElementById('planId').value;
+                    const plan = window.paymentManager.plans[planId];
+
+                    const mismatchOrder = await window.paymentManager.createOrder(
+                        planId,
+                        'alipay'
+                    );
+
+                    // 修改金额使其不匹配
+                    mismatchOrder.amount = plan.price + 100;
+
+                    await window.paymentManager.initiatePayment(mismatchOrder);
+                } catch (error) {
+                    this.log('error', 'success', '成功捕获金额不匹配错误', error.message);
+                }
+            }
+
+            /**
+             * 测试重复支付
+             */
+            async testDuplicatePayment() {
+                this.log('error', 'info', '测试重复支付防护');
+
+                try {
+                    const order = await window.paymentManager.createOrder(
+                        document.getElementById('planId').value,
+                        'alipay'
+                    );
+
+                    // 设置支付进行中
+                    window.paymentManager.paymentInProgress = true;
+
+                    // 尝试再次支付
+                    await window.paymentManager.initiatePayment(order);
+                } catch (error) {
+                    this.log('error', 'success', '成功阻止重复支付', error.message);
+                } finally {
+                    window.paymentManager.paymentInProgress = false;
+                }
+            }
+
+            /**
+             * 测试支付冷却
+             */
+            async testPaymentCooldown() {
+                this.log('error', 'info', '测试支付冷却期');
+
+                try {
+                    const order = await window.paymentManager.createOrder(
+                        document.getElementById('planId').value,
+                        'alipay'
+                    );
+
+                    // 设置最近支付时间
+                    window.paymentManager.lastPaymentTime = Date.now();
+
+                    // 尝试立即再次支付
+                    await window.paymentManager.initiatePayment(order);
+                } catch (error) {
+                    this.log('error', 'success', '成功触发支付冷却', error.message);
+                }
+            }
+
+            /**
+             * 记录日志
+             */
+            log(type, level, message, data = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+
+                if (data) {
+                    const dataStr = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+                    logEntry += '\n' + dataStr;
+                }
+
+                const resultPanel = document.getElementById(type + 'Result');
+                resultPanel.style.display = 'block';
+                resultPanel.className = `result-panel ${level}`;
+                resultPanel.textContent = resultPanel.textContent + logEntry + '\n\n';
+                resultPanel.scrollTop = resultPanel.scrollHeight;
+
+                console.log(`[PaymentTest-${type}]`, message, data);
+            }
+
+            /**
+             * 设置状态指示器
+             */
+            setStatus(type, status) {
+                const indicator = document.getElementById(type + 'Status');
+                indicator.className = `status-indicator ${status}`;
+            }
+
+            /**
+             * 更新测试统计
+             */
+            updateStats() {
+                document.getElementById('totalTests').textContent = this.testStats.total;
+                document.getElementById('passedTests').textContent = this.testStats.passed;
+                document.getElementById('failedTests').textContent = this.testStats.failed;
+
+                const successRate = this.testStats.total > 0
+                    ? Math.round((this.testStats.passed / this.testStats.total) * 100)
+                    : 0;
+                document.getElementById('successRate').textContent = successRate + '%';
+
+                const progress = this.testStats.total > 0 ? successRate : 0;
+                document.getElementById('progressFill').style.width = progress + '%';
+            }
+
+            /**
+             * 生成订单号
+             */
+            generateOrderId() {
+                return 'TEST' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();
+            }
+
+            /**
+             * 清空结果
+             */
+            clearResult(type) {
+                const resultPanel = document.getElementById(type + 'Result');
+                resultPanel.style.display = 'none';
+                resultPanel.textContent = '';
+                this.setStatus(type.replace('Result', ''), 'idle');
+            }
+
+            /**
+             * 测试支付流程
+             */
+            async testPaymentFlow() {
+                this.log('manager', 'info', '开始完整支付流程测试');
+
+                try {
+                    // 1. 创建订单
+                    const order = await window.paymentManager.createOrder(
+                        'basic_monthly',
+                        'alipay'
+                    );
+                    this.log('manager', 'success', '步骤1: 订单创建成功', order);
+
+                    // 2. 发起支付
+                    const paymentResult = await window.paymentManager.initiatePayment(order);
+                    this.log('manager', 'success', '步骤2: 支付发起成功', paymentResult);
+
+                    // 3. 等待并检查状态
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    const status = await window.paymentManager.checkPaymentStatus(order.orderId);
+                    this.log('manager', 'info', '步骤3: 支付状态', status);
+
+                    this.log('manager', 'success', '完整支付流程测试完成');
+
+                } catch (error) {
+                    this.log('manager', 'error', '支付流程测试失败', error.message);
+                }
+            }
+        }
+
+        // 全局函数
+        let paymentTest;
+
+        function testCreateOrder() {
+            paymentTest.testCreateOrder();
+        }
+
+        function testQueryStatus() {
+            paymentTest.testQueryStatus();
+        }
+
+        function testSimulateSuccess() {
+            paymentTest.testSimulateSuccess();
+        }
+
+        function testSimulateFailure() {
+            paymentTest.testSimulateFailure();
+        }
+
+        function testPaymentManager() {
+            paymentTest.testPaymentManager();
+        }
+
+        function testPaymentFlow() {
+            paymentTest.testPaymentFlow();
+        }
+
+        function testNetworkError() {
+            paymentTest.testNetworkError();
+        }
+
+        function testInvalidOrder() {
+            paymentTest.testInvalidOrder();
+        }
+
+        function testAmountMismatch() {
+            paymentTest.testAmountMismatch();
+        }
+
+        function testDuplicatePayment() {
+            paymentTest.testDuplicatePayment();
+        }
+
+        function testPaymentCooldown() {
+            paymentTest.testPaymentCooldown();
+        }
+
+        function clearApiResult() {
+            paymentTest.clearResult('api');
+        }
+
+        function clearManagerResult() {
+            paymentTest.clearResult('manager');
+        }
+
+        function clearErrorResult() {
+            paymentTest.clearResult('error');
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            paymentTest = new PaymentIntegrationTest();
+        });
+    </script>
+</body>
+</html>

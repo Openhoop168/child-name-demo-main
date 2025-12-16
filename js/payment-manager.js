@@ -148,6 +148,11 @@ class PaymentManager {
             // 设置事件监听器
             this.setupEventListeners();
 
+            // 初始化支付状态
+            this.paymentInProgress = false;
+            this.lastPaymentTime = 0;
+            this.paymentCooldown = 5000; // 5秒冷却期
+
             // 初始化UI状态
             this.updateUI();
 
@@ -761,19 +766,109 @@ class PaymentManager {
      * 发起支付
      */
     async initiatePayment(order) {
-        // 这里是支付接口的模拟实现
-        // 实际应用中需要调用真实的支付API
+        console.log('[PaymentManager] 发起支付:', order);
 
-        console.log('[PaymentManager] 模拟支付发起:', order);
+        // 验证订单状态
+        if (order.status !== 'pending') {
+            throw new Error('订单状态不正确，无法发起支付');
+        }
 
-        // 模拟支付URL生成
-        const paymentUrl = `https://payment.example.com/pay?orderId=${order.orderId}&amount=${order.amount}`;
+        // 防重复支付检查
+        if (this.paymentInProgress) {
+            throw new Error('支付正在处理中，请勿重复提交');
+        }
 
-        return {
-            success: true,
-            paymentUrl: paymentUrl,
-            orderId: order.orderId
-        };
+        // 检查支付冷却期
+        this.checkPaymentCooldown();
+
+        // 验证订单金额
+        const plan = this.plans[order.planId];
+        if (!plan) {
+            throw new Error('套餐不存在');
+        }
+
+        if (Math.abs(plan.price - order.amount) > 0.01) {
+            throw new Error('订单金额异常，请重新下单');
+        }
+
+        this.paymentInProgress = true;
+
+        try {
+            // 初始化支付API
+            const paymentApi = new PaymentAPI();
+
+            let paymentResult;
+
+            // 根据支付方式调用相应的API
+            if (order.paymentMethod === 'alipay') {
+                // 支付宝支付
+                paymentResult = await paymentApi.createAlipayOrder({
+                    orderId: order.orderId,
+                    amount: order.amount,
+                    subject: `儿童识字小报 - ${plan.name}`,
+                    body: `升级到${plan.name}，享受更多功能`,
+                    returnUrl: `${window.location.origin}/payment-result.html?type=success&orderId=${order.orderId}&planName=${encodeURIComponent(plan.name)}&amount=${order.amount}`,
+                    notifyUrl: `${window.location.origin}/api/payment/alipay/notify`
+                });
+
+            } else if (order.paymentMethod === 'wechat') {
+                // 微信支付
+                paymentResult = await paymentApi.createWechatOrder({
+                    orderId: order.orderId,
+                    amount: order.amount,
+                    description: `儿童识字小报 - ${plan.name}`,
+                    sceneInfo: {
+                        type: 'Wap',
+                        wap_url: window.location.origin,
+                        wap_name: '儿童识字小报'
+                    },
+                    notifyUrl: `${window.location.origin}/api/payment/wechat/notify`
+                });
+
+            } else {
+                throw new Error('不支持的支付方式');
+            }
+
+            if (paymentResult.success) {
+                // 保存支付信息
+                order.paymentUrl = paymentResult.paymentUrl;
+                order.qrCode = paymentResult.qrCode;
+                order.expireTime = paymentResult.expireTime;
+                await this.saveOrder(order);
+
+                // 跳转到支付页面
+                this.redirectToPayment(paymentResult, order);
+
+                return {
+                    success: true,
+                    orderId: order.orderId,
+                    paymentUrl: paymentResult.paymentUrl,
+                    qrCode: paymentResult.qrCode,
+                    expireTime: paymentResult.expireTime,
+                    provider: order.paymentMethod
+                };
+
+            } else {
+                throw new Error(paymentResult.error || '创建支付订单失败');
+            }
+
+        } catch (error) {
+            console.error('[PaymentManager] 支付发起失败:', error);
+
+            // 更新订单状态为失败
+            order.status = 'failed';
+            order.errorMessage = error.message;
+            await this.saveOrder(order);
+
+            return {
+                success: false,
+                error: error.message,
+                orderId: order.orderId
+            };
+
+        } finally {
+            this.paymentInProgress = false;
+        }
     }
 
     /**
@@ -809,15 +904,77 @@ class PaymentManager {
      * 检查支付状态
      */
     async checkPaymentStatus(orderId) {
-        // 模拟支付状态检查
-        // 实际应用中需要调用支付提供商的查询API
+        console.log('[PaymentManager] 查询支付状态:', orderId);
 
-        const order = await this.getOrder(orderId);
-        return {
-            status: order.status,
-            orderId: order.orderId,
-            expiredAt: order.expiredAt
-        };
+        try {
+            // 获取订单信息
+            const order = await this.getOrder(orderId);
+            if (!order) {
+                throw new Error('订单不存在');
+            }
+
+            // 检查订单是否已过期
+            if (order.expireTime && new Date() > new Date(order.expireTime)) {
+                if (order.status === 'pending') {
+                    order.status = 'expired';
+                    await this.saveOrder(order);
+                }
+                return {
+                    status: 'expired',
+                    orderId: order.orderId,
+                    message: '支付已过期'
+                };
+            }
+
+            // 如果订单已完成，直接返回状态
+            if (order.status === 'paid' || order.status === 'failed' || order.status === 'cancelled') {
+                return {
+                    status: order.status,
+                    orderId: order.orderId,
+                    paidAt: order.paidAt,
+                    tradeNo: order.tradeNo,
+                    message: this.getStatusMessage(order.status)
+                };
+            }
+
+            // 初始化支付API
+            const paymentApi = new PaymentAPI();
+
+            // 查询支付状态
+            const result = await paymentApi.queryPaymentStatus(orderId, order.paymentMethod);
+
+            if (result.success) {
+                // 更新本地订单状态
+                if (result.status !== order.status) {
+                    order.status = result.status;
+                    if (result.status === 'paid') {
+                        order.paidAt = result.paidAt;
+                        order.tradeNo = result.tradeNo;
+                    }
+                    await this.saveOrder(order);
+                }
+
+                return {
+                    status: result.status,
+                    orderId: order.orderId,
+                    paidAt: result.paidAt,
+                    tradeNo: result.tradeNo,
+                    message: result.message
+                };
+            } else {
+                throw new Error(result.error || '查询支付状态失败');
+            }
+
+        } catch (error) {
+            console.error('[PaymentManager] 查询支付状态失败:', error);
+
+            // 返回未知状态，让调用方决定如何处理
+            return {
+                status: 'unknown',
+                orderId: orderId,
+                error: error.message
+            };
+        }
     }
 
     /**
@@ -825,23 +982,72 @@ class PaymentManager {
      */
     async handlePaymentSuccess(orderId) {
         try {
+            console.log('[PaymentManager] 处理支付成功:', orderId);
+
+            // 获取订单信息
             const order = await this.getOrder(orderId);
+            if (!order) {
+                throw new Error('订单不存在');
+            }
+
+            // 再次确认支付状态（防止伪造）
+            const statusResult = await this.checkPaymentStatus(orderId);
+            if (statusResult.status !== 'paid') {
+                throw new Error('支付状态验证失败');
+            }
 
             // 更新订单状态
             order.status = 'paid';
-            order.paidAt = new Date().toISOString();
+            order.paidAt = statusResult.paidAt || new Date().toISOString();
+            order.tradeNo = statusResult.tradeNo;
             await this.saveOrder(order);
 
             // 升级订阅
             await this.upgradeSubscription(order.planId, order);
 
+            // 记录支付成功事件
+            this.triggerEvent('paymentSuccess', {
+                orderId: orderId,
+                planId: order.planId,
+                planName: order.planName,
+                amount: order.amount,
+                paymentMethod: order.paymentMethod,
+                tradeNo: order.tradeNo,
+                paidAt: order.paidAt
+            });
+
+            // 显示成功提示
+            this.showPaymentSuccess(`支付成功！已升级到${order.planName}`);
+
+            // 关闭支付模态框
             this.closePaymentModal();
-            this.showPaymentSuccess('支付成功！套餐已升级');
+
+            // 跳转到支付结果页面
+            this.redirectToPaymentResult('success', {
+                orderId: orderId,
+                planName: order.planName,
+                amount: order.amount
+            });
 
             console.log('[PaymentManager] 支付成功处理完成:', orderId);
+
         } catch (error) {
             console.error('[PaymentManager] 支付成功处理失败:', error);
+
+            // 记录错误事件
+            this.triggerEvent('paymentSuccessError', {
+                orderId: orderId,
+                error: error.message
+            });
+
+            // 显示错误提示
             this.showPaymentError('支付成功但升级失败，请联系客服');
+
+            // 跳转到支付结果页面显示错误
+            this.redirectToPaymentResult('error', {
+                orderId: orderId,
+                error: '支付成功但升级失败，请联系客服'
+            });
         }
     }
 
@@ -850,14 +1056,48 @@ class PaymentManager {
      */
     async handlePaymentFailure(orderId, message) {
         try {
+            console.log('[PaymentManager] 处理支付失败:', orderId, message);
+
+            // 获取订单信息
             const order = await this.getOrder(orderId);
+            if (!order) {
+                throw new Error('订单不存在');
+            }
+
+            // 更新订单状态
             order.status = 'failed';
+            order.errorMessage = message || '支付失败';
+            order.failedAt = new Date().toISOString();
             await this.saveOrder(order);
 
-            this.closePaymentModal();
+            // 记录支付失败事件
+            this.triggerEvent('paymentFailed', {
+                orderId: orderId,
+                planId: order.planId,
+                planName: order.planName,
+                amount: order.amount,
+                paymentMethod: order.paymentMethod,
+                error: message,
+                failedAt: order.failedAt
+            });
+
+            // 显示错误提示
             this.showPaymentError(`支付失败: ${message || '未知错误'}`);
+
+            // 关闭支付模态框
+            this.closePaymentModal();
+
+            // 跳转到支付结果页面
+            this.redirectToPaymentResult('failed', {
+                orderId: orderId,
+                error: message || '支付失败'
+            });
+
         } catch (error) {
             console.error('[PaymentManager] 支付失败处理失败:', error);
+
+            // 显示通用错误提示
+            this.showPaymentError('支付处理异常，请联系客服');
         }
     }
 
@@ -866,14 +1106,45 @@ class PaymentManager {
      */
     async handlePaymentExpired(orderId) {
         try {
+            console.log('[PaymentManager] 处理支付过期:', orderId);
+
+            // 获取订单信息
             const order = await this.getOrder(orderId);
+            if (!order) {
+                throw new Error('订单不存在');
+            }
+
+            // 更新订单状态
             order.status = 'expired';
+            order.expiredAt = new Date().toISOString();
             await this.saveOrder(order);
 
-            this.closePaymentModal();
+            // 记录支付过期事件
+            this.triggerEvent('paymentExpired', {
+                orderId: orderId,
+                planId: order.planId,
+                planName: order.planName,
+                amount: order.amount,
+                paymentMethod: order.paymentMethod,
+                expiredAt: order.expiredAt
+            });
+
+            // 显示过期提示
             this.showPaymentError('支付已超时，请重新发起支付');
+
+            // 关闭支付模态框
+            this.closePaymentModal();
+
+            // 跳转到支付结果页面
+            this.redirectToPaymentResult('expired', {
+                orderId: orderId
+            });
+
         } catch (error) {
             console.error('[PaymentManager] 支付过期处理失败:', error);
+
+            // 显示通用错误提示
+            this.showPaymentError('支付超时处理异常，请重试');
         }
     }
 
@@ -1167,8 +1438,125 @@ class PaymentManager {
     }
 
     /**
-     * 触发自定义事件
+     * 跳转到支付页面
      */
+    redirectToPayment(paymentResult, order) {
+        console.log('[PaymentManager] 跳转到支付页面:', paymentResult);
+
+        // 如果有支付URL，直接跳转
+        if (paymentResult.paymentUrl) {
+            // 在新窗口中打开支付页面
+            const paymentWindow = window.open(
+                paymentResult.paymentUrl,
+                'payment_window',
+                'width=800,height=600,scrollbars=yes,resizable=yes'
+            );
+
+            // 监听支付窗口关闭
+            if (paymentWindow) {
+                const checkClosed = setInterval(() => {
+                    if (paymentWindow.closed) {
+                        clearInterval(checkClosed);
+                        // 开始轮询支付状态
+                        this.startPaymentStatusPolling(order.orderId);
+                    }
+                }, 1000);
+            } else {
+                // 如果弹窗被阻止，跳转到结果页面
+                this.redirectToPaymentResult('processing', {
+                    orderId: order.orderId,
+                    planName: order.planName
+                });
+            }
+        } else {
+            // 如果没有支付URL，跳转到结果页面
+            this.redirectToPaymentResult('processing', {
+                orderId: order.orderId,
+                planName: order.planName
+            });
+        }
+    }
+
+    /**
+     * 跳转到支付结果页面
+     */
+    redirectToPaymentResult(resultType, data) {
+        console.log('[PaymentManager] 跳转到支付结果页面:', { resultType, data });
+
+        // 构建结果页面URL
+        const params = new URLSearchParams({
+            type: resultType,
+            orderId: data.orderId,
+            timestamp: Date.now()
+        });
+
+        if (data.planName) {
+            params.set('planName', data.planName);
+        }
+
+        if (data.amount) {
+            params.set('amount', data.amount);
+        }
+
+        if (data.error) {
+            params.set('error', data.error);
+        }
+
+        const resultUrl = `payment-result.html?${params.toString()}`;
+
+        // 如果当前不在结果页面，则跳转
+        if (!window.location.pathname.includes('payment-result.html')) {
+            window.location.href = resultUrl;
+        }
+    }
+
+    /**
+     * 获取状态消息
+     */
+    getStatusMessage(status) {
+        const messages = {
+            pending: '支付处理中，请稍候...',
+            paid: '支付成功',
+            failed: '支付失败',
+            cancelled: '支付已取消',
+            expired: '支付已过期',
+            refunded: '已退款',
+            unknown: '状态未知'
+        };
+
+        return messages[status] || '未知状态';
+    }
+
+    /**
+     * 验证订单金额
+     */
+    validateOrderAmount(planId, expectedAmount) {
+        const plan = this.plans[planId];
+        if (!plan) {
+            throw new Error('套餐不存在');
+        }
+
+        if (Math.abs(plan.price - expectedAmount) > 0.01) {
+            throw new Error('订单金额异常，请重新下单');
+        }
+
+        return true;
+    }
+
+    /**
+     * 检查支付冷却期
+     */
+    checkPaymentCooldown() {
+        const now = Date.now();
+        if (now - this.lastPaymentTime < this.paymentCooldown) {
+            const remainingTime = Math.ceil((this.paymentCooldown - (now - this.lastPaymentTime)) / 1000);
+            throw new Error(`操作过于频繁，请${remainingTime}秒后再试`);
+        }
+
+        this.lastPaymentTime = now;
+        return true;
+    }
+
     triggerEvent(eventName, detail) {
         try {
             if (typeof CustomEvent !== 'undefined' && typeof window !== 'undefined') {

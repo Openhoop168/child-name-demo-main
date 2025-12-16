@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>支付结果 - 儿童识字小报生成器</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 支付结果页面特定样式 */
+        .payment-result-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .result-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+
+        .result-icon.success {
+            background: #d4edda;
+            color: #28a745;
+        }
+
+        .result-icon.failed {
+            background: #f8d7da;
+            color: #dc3545;
+        }
+
+        .result-icon.processing {
+            background: #fff3cd;
+            color: #ffc107;
+        }
+
+        .result-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .result-title.success {
+            color: #28a745;
+        }
+
+        .result-title.failed {
+            color: #dc3545;
+        }
+
+        .result-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .order-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .order-info h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+
+        .order-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .order-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .order-info-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .order-info-value {
+            color: #2c3e50;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: #45B7D1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3498db;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background: #dee2e6;
+            transform: translateY(-2px);
+        }
+
+        .contact-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .contact-info h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .countdown {
+            font-size: 14px;
+            color: #666;
+            margin-top: 15px;
+        }
+
+        .countdown.warning {
+            color: #ffc107;
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-card {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .loading {
+            animation: spin 1s linear infinite;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            .payment-result-container {
+                padding: 10px;
+            }
+
+            .result-card {
+                padding: 20px;
+            }
+
+            .result-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+            }
+
+            .result-title {
+                font-size: 20px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-result-container">
+        <div class="result-card">
+            <!-- 结果图标 -->
+            <div class="result-icon" id="resultIcon">
+                <i class="fas fa-question-circle"></i>
+            </div>
+
+            <!-- 结果标题 -->
+            <h1 class="result-title" id="resultTitle">处理中...</h1>
+
+            <!-- 结果消息 -->
+            <p class="result-message" id="resultMessage">正在查询支付结果，请稍候...</p>
+
+            <!-- 订单信息 -->
+            <div class="order-info" id="orderInfo" style="display: none;">
+                <h3>订单信息</h3>
+                <div class="order-info-item">
+                    <span class="order-info-label">订单号：</span>
+                    <span class="order-info-value" id="orderId">-</span>
+                </div>
+                <div class="order-info-item">
+                    <span class="order-info-label">套餐名称：</span>
+                    <span class="order-info-value" id="planName">-</span>
+                </div>
+                <div class="order-info-item">
+                    <span class="order-info-label">支付金额：</span>
+                    <span class="order-info-value" id="amount">-</span>
+                </div>
+                <div class="order-info-item" id="paidAtItem" style="display: none;">
+                    <span class="order-info-label">支付时间：</span>
+                    <span class="order-info-value" id="paidAt">-</span>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons" id="actionButtons">
+                <!-- 按钮将通过JavaScript动态添加 -->
+            </div>
+
+            <!-- 倒计时提示 -->
+            <div class="countdown" id="countdown" style="display: none;"></div>
+        </div>
+
+        <!-- 联系信息 -->
+        <div class="contact-info">
+            <h4>需要帮助？</h4>
+            <p>如果您在支付过程中遇到任何问题，请及时联系我们：</p>
+            <p>📧 邮箱：support@child-literacy.com</p>
+            <p>📱 客服热线：400-123-4567</p>
+            <p>⏰ 服务时间：周一至周日 9:00-21:00</p>
+        </div>
+    </div>
+
+    <!-- 引入必要的脚本 -->
+    <script src="js/config.js"></script>
+    <script src="js/storage-manager.js"></script>
+    <script src="js/payment-api.js"></script>
+    <script src="js/payment-manager.js"></script>
+
+    <script>
+        /**
+         * 支付结果页面逻辑
+         */
+        class PaymentResultPage {
+            constructor() {
+                this.urlParams = new URLSearchParams(window.location.search);
+                this.resultType = this.urlParams.get('type') || 'unknown';
+                this.orderId = this.urlParams.get('orderId');
+                this.planName = this.urlParams.get('planName') || '';
+                this.amount = this.urlParams.get('amount') || '';
+                this.error = this.urlParams.get('error') || '';
+                this.autoRedirectTimer = null;
+                this.countdownTimer = null;
+
+                console.log('[PaymentResultPage] 初始化，参数：', {
+                    type: this.resultType,
+                    orderId: this.orderId,
+                    planName: this.planName,
+                    amount: this.amount,
+                    error: this.error
+                });
+
+                this.init();
+            }
+
+            /**
+             * 初始化页面
+             */
+            async init() {
+                try {
+                    // 显示结果
+                    await this.displayResult();
+
+                    // 如果是处理中状态，开始轮询
+                    if (this.resultType === 'processing' || this.resultType === 'pending') {
+                        await this.startStatusPolling();
+                    }
+
+                } catch (error) {
+                    console.error('[PaymentResultPage] 初始化失败:', error);
+                    this.showError('页面加载失败，请刷新重试');
+                }
+            }
+
+            /**
+             * 显示支付结果
+             */
+            async displayResult() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                switch (this.resultType) {
+                    case 'success':
+                        this.showSuccess();
+                        break;
+                    case 'failed':
+                        this.showFailed();
+                        break;
+                    case 'cancelled':
+                        this.showCancelled();
+                        break;
+                    case 'expired':
+                        this.showExpired();
+                        break;
+                    case 'processing':
+                    case 'pending':
+                        this.showProcessing();
+                        break;
+                    default:
+                        // 如果没有指定类型，尝试查询订单状态
+                        if (this.orderId) {
+                            await this.queryOrderStatus();
+                        } else {
+                            this.showError('无效的支付结果页面');
+                        }
+                        break;
+                }
+            }
+
+            /**
+             * 显示支付成功
+             */
+            showSuccess() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon success';
+                resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                resultTitle.className = 'result-title success';
+                resultTitle.textContent = '支付成功！';
+                resultMessage.textContent = `恭喜您！已成功升级到${this.planName || '付费套餐'}`;
+
+                // 显示订单信息
+                this.showOrderInfo();
+
+                // 显示操作按钮
+                this.showActionButtons('success');
+
+                // 设置自动跳转
+                this.setAutoRedirect(10, 'index.html');
+            }
+
+            /**
+             * 显示支付失败
+             */
+            showFailed() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon failed';
+                resultIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
+                resultTitle.className = 'result-title failed';
+                resultTitle.textContent = '支付失败';
+                resultMessage.textContent = this.error || '支付过程中出现错误，请重试';
+
+                // 显示订单信息
+                this.showOrderInfo();
+
+                // 显示操作按钮
+                this.showActionButtons('failed');
+            }
+
+            /**
+             * 显示支付取消
+             */
+            showCancelled() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon failed';
+                resultIcon.innerHTML = '<i class="fas fa-ban"></i>';
+                resultTitle.className = 'result-title failed';
+                resultTitle.textContent = '支付已取消';
+                resultMessage.textContent = '您已取消支付，可以随时重新发起';
+
+                // 显示订单信息
+                this.showOrderInfo();
+
+                // 显示操作按钮
+                this.showActionButtons('cancelled');
+            }
+
+            /**
+             * 显示支付过期
+             */
+            showExpired() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon failed';
+                resultIcon.innerHTML = '<i class="fas fa-clock"></i>';
+                resultTitle.className = 'result-title failed';
+                resultTitle.textContent = '支付已过期';
+                resultMessage.textContent = '支付请求已过期，请重新下单';
+
+                // 显示订单信息
+                this.showOrderInfo();
+
+                // 显示操作按钮
+                this.showActionButtons('expired');
+            }
+
+            /**
+             * 显示处理中
+             */
+            showProcessing() {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon processing';
+                resultIcon.innerHTML = '<i class="fas fa-spinner loading"></i>';
+                resultTitle.className = 'result-title processing';
+                resultTitle.textContent = '支付处理中';
+                resultMessage.textContent = '正在查询支付结果，请稍候...';
+
+                // 显示订单信息
+                this.showOrderInfo();
+
+                // 不显示操作按钮，等待查询结果
+            }
+
+            /**
+             * 显示错误
+             */
+            showError(message) {
+                const resultIcon = document.getElementById('resultIcon');
+                const resultTitle = document.getElementById('resultTitle');
+                const resultMessage = document.getElementById('resultMessage');
+
+                resultIcon.className = 'result-icon failed';
+                resultIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                resultTitle.className = 'result-title failed';
+                resultTitle.textContent = '出现错误';
+                resultMessage.textContent = message;
+
+                // 显示返回按钮
+                this.showActionButtons('error');
+            }
+
+            /**
+             * 显示订单信息
+             */
+            showOrderInfo() {
+                const orderInfo = document.getElementById('orderInfo');
+                const orderIdEl = document.getElementById('orderId');
+                const planNameEl = document.getElementById('planName');
+                const amountEl = document.getElementById('amount');
+                const paidAtEl = document.getElementById('paidAt');
+                const paidAtItem = document.getElementById('paidAtItem');
+
+                if (this.orderId) {
+                    orderIdEl.textContent = this.orderId;
+                    planNameEl.textContent = this.planName || '未知套餐';
+                    amountEl.textContent = this.amount ? `¥${parseFloat(this.amount).toFixed(2)}` : '-';
+
+                    if (this.resultType === 'success') {
+                        paidAtEl.textContent = new Date().toLocaleString('zh-CN');
+                        paidAtItem.style.display = 'flex';
+                    }
+
+                    orderInfo.style.display = 'block';
+                }
+            }
+
+            /**
+             * 显示操作按钮
+             */
+            showActionButtons(type) {
+                const actionButtons = document.getElementById('actionButtons');
+                actionButtons.innerHTML = '';
+
+                switch (type) {
+                    case 'success':
+                        actionButtons.innerHTML = `
+                            <a href="index.html" class="btn btn-primary">
+                                <i class="fas fa-home"></i>
+                                开始使用
+                            </a>
+                            <a href="index.html#settings" class="btn btn-secondary">
+                                <i class="fas fa-cog"></i>
+                                查看订阅
+                            </a>
+                        `;
+                        break;
+                    case 'failed':
+                    case 'cancelled':
+                    case 'expired':
+                        actionButtons.innerHTML = `
+                            <button onclick="paymentResult.retryPayment()" class="btn btn-primary">
+                                <i class="fas fa-redo"></i>
+                                重新支付
+                            </button>
+                            <a href="index.html" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                返回首页
+                            </a>
+                        `;
+                        break;
+                    default:
+                        actionButtons.innerHTML = `
+                            <a href="index.html" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i>
+                                返回首页
+                            </a>
+                        `;
+                        break;
+                }
+            }
+
+            /**
+             * 设置自动跳转
+             */
+            setAutoRedirect(seconds, url) {
+                const countdown = document.getElementById('countdown');
+                let remainingSeconds = seconds;
+
+                countdown.innerHTML = `<i class="fas fa-clock"></i> ${remainingSeconds}秒后自动跳转到首页`;
+                countdown.style.display = 'block';
+
+                this.countdownTimer = setInterval(() => {
+                    remainingSeconds--;
+                    if (remainingSeconds > 0) {
+                        countdown.innerHTML = `<i class="fas fa-clock"></i> ${remainingSeconds}秒后自动跳转到首页`;
+                    } else {
+                        clearInterval(this.countdownTimer);
+                        window.location.href = url;
+                    }
+                }, 1000);
+
+                // 点击倒计时可以取消自动跳转
+                countdown.onclick = () => {
+                    clearInterval(this.countdownTimer);
+                    countdown.innerHTML = '<i class="fas fa-pause"></i> 已取消自动跳转';
+                    countdown.classList.add('warning');
+                };
+            }
+
+            /**
+             * 开始状态轮询
+             */
+            async startStatusPolling() {
+                if (!this.orderId) {
+                    return;
+                }
+
+                const paymentApi = new PaymentAPI();
+                let pollCount = 0;
+                const maxPolls = 20; // 最多轮询20次
+
+                const pollInterval = setInterval(async () => {
+                    pollCount++;
+
+                    try {
+                        const result = await paymentApi.queryPaymentStatus(this.orderId, 'unknown');
+
+                        if (result.success && result.status !== 'pending') {
+                            clearInterval(pollInterval);
+                            this.handleStatusResult(result);
+                        } else if (pollCount >= maxPolls) {
+                            clearInterval(pollInterval);
+                            this.showExpired();
+                        }
+
+                    } catch (error) {
+                        console.error('[PaymentResultPage] 状态查询失败:', error);
+                        if (pollCount >= maxPolls) {
+                            clearInterval(pollInterval);
+                            this.showError('查询支付状态失败，请手动刷新页面');
+                        }
+                    }
+                }, 3000); // 每3秒查询一次
+            }
+
+            /**
+             * 查询订单状态
+             */
+            async queryOrderStatus() {
+                if (!this.orderId) {
+                    this.showError('缺少订单信息');
+                    return;
+                }
+
+                try {
+                    const paymentApi = new PaymentAPI();
+                    const result = await paymentApi.queryPaymentStatus(this.orderId, 'unknown');
+
+                    if (result.success) {
+                        this.handleStatusResult(result);
+                    } else {
+                        this.showError(result.error || '查询订单状态失败');
+                    }
+
+                } catch (error) {
+                    console.error('[PaymentResultPage] 查询订单状态失败:', error);
+                    this.showError('查询订单状态失败，请刷新重试');
+                }
+            }
+
+            /**
+             * 处理状态结果
+             */
+            handleStatusResult(result) {
+                switch (result.status) {
+                    case 'paid':
+                        this.resultType = 'success';
+                        break;
+                    case 'failed':
+                        this.resultType = 'failed';
+                        this.error = result.message || '支付失败';
+                        break;
+                    case 'cancelled':
+                        this.resultType = 'cancelled';
+                        break;
+                    default:
+                        this.resultType = 'failed';
+                        this.error = '未知支付状态';
+                        break;
+                }
+
+                this.displayResult();
+            }
+
+            /**
+             * 重新支付
+             */
+            retryPayment() {
+                // 跳转回首页，自动打开支付界面
+                window.location.href = `index.html#upgrade?orderId=${this.orderId}`;
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            window.paymentResult = new PaymentResultPage();
+        });
+    </script>
+</body>
+</html>

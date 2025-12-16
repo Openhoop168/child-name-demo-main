@@ -91,11 +91,18 @@ window.APP_CONFIG = {
         enabled: "{{ENABLE_PAYMENT}}" !== "false",
         provider: "{{PAYMENT_PROVIDER}}" || "alipay", // alipay | wechat | both
         sandbox: "{{PAYMENT_SANDBOX}}" === "true",
-        returnUrl: "{{PAYMENT_RETURN_URL}}" || window.location.origin + "/payment/return",
+        apiBaseUrl: "{{PAYMENT_API_BASE_URL}}" || "/api/payment", // 支付API基础URL
+        returnUrl: "{{PAYMENT_RETURN_URL}}" || window.location.origin + "/payment-result.html",
         notifyUrl: "{{PAYMENT_NOTIFY_URL}}" || window.location.origin + "/api/payment/notify",
         currency: "CNY",
         maxOrderAge: 3600000, // 1小时（毫秒）
         nonceExpireTime: 300000, // 5分钟（毫秒）
+        // 支付结果页面配置
+        resultPage: {
+            autoRedirect: true,
+            autoRedirectDelay: 10, // 自动跳转延迟（秒）
+            showCountdown: true
+        }
 
         // 套餐配置
         plans: {
