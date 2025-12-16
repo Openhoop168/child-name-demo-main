@@ -65,9 +65,27 @@ class PaymentAPI {
 
     /**
      * 模拟API调用失败
+     * 测试模式下默认不失败
      */
-    simulateApiFailure(failureRate = 0.05) {
+    simulateApiFailure(failureRate = 0) {
+        // 在测试环境中，默认不模拟失败
+        // 如果需要测试失败场景，可以通过参数控制
         return Math.random() < failureRate;
+    }
+
+    /**
+     * 设置测试模式
+     */
+    setTestMode(mode = 'normal') {
+        this.testMode = mode; // 'normal', 'success', 'failure'
+        console.log(`[PaymentAPI] 测试模式设置为: ${mode}`);
+    }
+
+    /**
+     * 获取测试模式
+     */
+    getTestMode() {
+        return this.testMode || 'normal';
     }
 
     /**
@@ -85,9 +103,10 @@ class PaymentAPI {
             // 模拟网络请求
             await this.simulateNetworkDelay();
 
-            // 模拟API失败
-            if (this.simulateApiFailure()) {
-                throw new Error('网络请求失败，请重试');
+            // 根据测试模式决定结果
+            const testMode = this.getTestMode();
+            if (testMode === 'failure') {
+                throw new Error('模拟支付失败');
             }
 
             // 生成模拟支付URL
@@ -138,9 +157,10 @@ class PaymentAPI {
             // 模拟网络请求
             await this.simulateNetworkDelay();
 
-            // 模拟API失败
-            if (this.simulateApiFailure()) {
-                throw new Error('微信支付服务暂时不可用');
+            // 根据测试模式决定结果
+            const testMode = this.getTestMode();
+            if (testMode === 'failure') {
+                throw new Error('模拟微信支付失败');
             }
 
             // 生成模拟支付URL
@@ -339,23 +359,42 @@ class PaymentAPI {
         const createdTime = new Date(order.createdAt).getTime();
         const elapsedMinutes = (now - createdTime) / (1000 * 60);
 
-        // 模拟不同时间的状态变化
-        if (elapsedMinutes < 1) {
-            // 1分钟内：支付中
-            return { status: 'pending' };
-        } else if (elapsedMinutes < 2) {
-            // 1-2分钟：80%概率支付成功
-            return {
-                status: Math.random() < 0.8 ? 'paid' : 'pending'
-            };
-        } else if (elapsedMinutes < 5) {
-            // 2-5分钟：90%概率支付成功
-            return {
-                status: Math.random() < 0.9 ? 'paid' : 'failed'
-            };
+        // 根据测试模式返回确定的结果
+        const testMode = this.getTestMode();
+
+        if (testMode === 'success') {
+            // 成功模式：1秒后支付成功
+            if (elapsedMinutes * 60 < 1) {
+                return { status: 'pending' };
+            } else {
+                return { status: 'paid' };
+            }
+        } else if (testMode === 'failure') {
+            // 失败模式：2秒后支付失败
+            if (elapsedMinutes * 60 < 2) {
+                return { status: 'pending' };
+            } else {
+                return { status: 'failed' };
+            }
         } else {
-            // 5分钟后：支付失败
-            return { status: 'failed' };
+            // 正常模式：基于时间的随机状态
+            if (elapsedMinutes < 1) {
+                // 1分钟内：支付中
+                return { status: 'pending' };
+            } else if (elapsedMinutes < 2) {
+                // 1-2分钟：80%概率支付成功
+                return {
+                    status: Math.random() < 0.8 ? 'paid' : 'pending'
+                };
+            } else if (elapsedMinutes < 5) {
+                // 2-5分钟：90%概率支付成功
+                return {
+                    status: Math.random() < 0.9 ? 'paid' : 'failed'
+                };
+            } else {
+                // 5分钟后：支付失败
+                return { status: 'failed' };
+            }
         }
     }
 

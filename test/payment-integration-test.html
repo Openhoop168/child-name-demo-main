@@ -275,6 +275,14 @@
                 <button class="btn btn-danger" onclick="testSimulateFailure()">
                     模拟失败
                 </button>
+                <div style="margin-top: 10px;">
+                    <label>测试模式：</label>
+                    <select id="testMode" onchange="changeTestMode()">
+                        <option value="normal">正常模式</option>
+                        <option value="success">总是成功</option>
+                        <option value="failure">总是失败</option>
+                    </select>
+                </div>
                 <button class="btn btn-secondary" onclick="clearApiResult()">
                     清空结果
                 </button>
@@ -920,6 +928,12 @@
 
         function clearErrorResult() {
             paymentTest.clearResult('error');
+        }
+
+        function changeTestMode() {
+            const mode = document.getElementById('testMode').value;
+            paymentTest.paymentApi.setTestMode(mode);
+            paymentTest.log('api', 'info', `测试模式已切换到: ${mode}`);
         }
 
         // 初始化

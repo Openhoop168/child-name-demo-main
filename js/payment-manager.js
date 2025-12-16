@@ -671,6 +671,9 @@ class PaymentManager {
         }
 
         // 付费套餐处理支付
+        // 保存当前订阅状态，以便在失败时恢复
+        const originalSubscription = JSON.parse(JSON.stringify(this.currentSubscription));
+
         try {
             this.showPaymentProcessing();
 
@@ -692,6 +695,17 @@ class PaymentManager {
 
         } catch (error) {
             console.error('[PaymentManager] 支付处理失败:', error);
+
+            // 恢复原始订阅状态
+            try {
+                this.currentSubscription = originalSubscription;
+                await this.saveUserSubscription();
+                this.updateUI();
+                console.log('[PaymentManager] 已恢复原始订阅状态');
+            } catch (restoreError) {
+                console.error('[PaymentManager] 恢复订阅状态失败:', restoreError);
+            }
+
             this.showPaymentError(error.message);
         }
     }
